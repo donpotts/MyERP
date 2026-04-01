@@ -1,0 +1,38 @@
+@inject NavigationManager Nav
+@implements IDisposable
+
+@{
+    var uri    = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+    var target = string.IsNullOrEmpty(Href) ? "" : Href.TrimEnd('/');
+    bool isActive;
+    if (target == "")
+        isActive = uri == "" || uri == "/";
+    else
+        isActive = uri.Equals("/" + target, StringComparison.OrdinalIgnoreCase)
+                || uri.StartsWith("/" + target + "/", StringComparison.OrdinalIgnoreCase);
+}
+
+<a href="@Href" @onclick="HandleClick"
+   data-nav-tip="@(Collapsed ? Label : null)"
+   class="flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors @(isActive ? "bg-indigo-50 text-indigo-600 font-medium" : "text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white")">
+    <span class="material-icons-outlined text-xl flex-shrink-0">@Icon</span>
+    <span class="sidebar-text">@Label</span>
+</a>
+
+@code {
+    [Parameter] public string        Icon      { get; set; } = "";
+    [Parameter] public string        Label     { get; set; } = "";
+    [Parameter] public string        Href      { get; set; } = "";
+    [Parameter] public bool          Collapsed { get; set; }
+    [Parameter] public EventCallback OnClick   { get; set; }
+
+    protected override void OnInitialized()
+        => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private async Task HandleClick() => await OnClick.InvokeAsync();
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

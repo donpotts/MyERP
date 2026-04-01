@@ -1,0 +1,232 @@
+@page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>Dashboard - ERP</PageTitle>
+
+@if (data is null)
+{
+    <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+    </div>
+}
+else
+{
+    @* ── Header ── *@
+    <div class="bg-white rounded-xl p-4 sm:p-6 mb-6 border border-gray-200">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-800">ENTERPRISE <span class="text-indigo-600">RESOURCE PLANNING</span></h1>
+                <p class="text-sm text-gray-500 mt-1">EXECUTIVE DASHBOARD &bull; FISCAL YEAR 2026 &bull; STATUS: <span class="text-green-500 font-semibold">LIVE</span></p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <span class="px-3 py-1 bg-indigo-600 text-white rounded text-sm font-medium">@data.TotalCustomers CUSTOMERS</span>
+                <span class="px-3 py-1 bg-white border border-gray-200 text-gray-700 rounded text-sm font-medium">@data.ActiveProjects PROJECTS</span>
+            </div>
+        </div>
+    </div>
+
+    @* ── KPI Cards Row 1 ── *@
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div class="bg-white p-4 border border-gray-200 rounded-xl border-t-4 border-t-indigo-500">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</p>
+            <div class="mt-2">
+                <span class="text-2xl sm:text-3xl font-bold text-gray-800">@FormatCurrency(data.TotalRevenue)</span>
+            </div>
+            <p class="text-xs text-green-500 mt-1 font-medium">&#x25B2; YTD</p>
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl border-t-4 border-t-green-500">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Profit</p>
+            <div class="mt-2">
+                <span class="text-2xl sm:text-3xl font-bold text-gray-800">@FormatCurrency(data.GrossProfit)</span>
+            </div>
+            <p class="text-xs text-green-500 mt-1 font-medium">Margin: @data.ProfitMargin.ToString("F1")%</p>
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl border-t-4 border-t-blue-500">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Balance</p>
+            <div class="mt-2">
+                <span class="text-2xl sm:text-3xl font-bold text-gray-800">@FormatCurrency(data.CashBalance)</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1 font-medium">Available</p>
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl border-t-4 border-t-yellow-500">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Orders</p>
+            <div class="mt-2 flex items-baseline gap-2 flex-wrap">
+                <span class="text-2xl sm:text-3xl font-bold text-gray-800">@data.TotalOrders</span>
+                <span class="text-sm text-orange-500 font-medium">@data.PendingOrders pending</span>
+            </div>
+        </div>
+    </div>
+
+    @* ── KPI Cards Row 2 ── *@
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div class="bg-white p-4 border border-gray-200 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Inventory Value</p>
+                <span class="material-icons-outlined text-teal-500 text-lg">inventory_2</span>
+            </div>
+            <span class="text-xl font-bold text-gray-800">@FormatCurrency(data.InventoryValue)</span>
+            @if (data.LowStockItems > 0)
+            {
+                <p class="text-xs text-red-500 mt-1">&#9888; @data.LowStockItems low stock</p>
+            }
+            else
+            {
+                <p class="text-xs text-green-500 mt-1">&#10003; Stock healthy</p>
+            }
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">AR Balance</p>
+                <span class="material-icons-outlined text-blue-500 text-lg">account_balance</span>
+            </div>
+            <span class="text-xl font-bold text-gray-800">@FormatCurrency(data.AccountsReceivable)</span>
+            <p class="text-xs text-gray-400 mt-1">Outstanding</p>
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">AP Balance</p>
+                <span class="material-icons-outlined text-red-500 text-lg">payment</span>
+            </div>
+            <span class="text-xl font-bold text-gray-800">@FormatCurrency(data.AccountsPayable)</span>
+            <p class="text-xs text-gray-400 mt-1">Due to vendors</p>
+        </div>
+        <div class="bg-white p-4 border border-gray-200 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Open Leads</p>
+                <span class="material-icons-outlined text-purple-500 text-lg">contacts</span>
+            </div>
+            <span class="text-xl font-bold text-gray-800">@data.OpenLeads</span>
+            <p class="text-xs text-gray-400 mt-1">In pipeline</p>
+        </div>
+    </div>
+
+    @* ── Charts row ── *@
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        @* Revenue vs Expenses *@
+        <div class="lg:col-span-2 bg-white rounded-xl p-5 border border-gray-200">
+            <h3 class="font-semibold text-gray-800 mb-4 uppercase text-sm">Revenue vs Expenses (Monthly)</h3>
+            <div class="space-y-2.5">
+                @{
+                    var maxVal = data.RevenueChart.Any() ? data.RevenueChart.Max(p => Math.Max((double)p.Revenue, (double)p.Expenses)) : 1;
+                }
+                @foreach (var point in data.RevenueChart)
+                {
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500 font-medium w-8">@point.Month</span>
+                            <span class="text-gray-400">@FormatCurrencyShort(point.Revenue) / @FormatCurrencyShort(point.Expenses)</span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2">
+                            <div class="bg-indigo-500 h-2 rounded-full transition-all" style="width: @(maxVal > 0 ? (double)point.Revenue * 100 / maxVal : 0)%"></div>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-1.5 mt-0.5">
+                            <div class="bg-red-300 h-1.5 rounded-full transition-all" style="width: @(maxVal > 0 ? (double)point.Expenses * 100 / maxVal : 0)%"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="flex gap-4 mt-4 text-xs text-gray-500">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-2 bg-indigo-500 rounded-sm inline-block"></span> Revenue</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-2 bg-red-300 rounded-sm inline-block"></span> Expenses</span>
+            </div>
+        </div>
+
+        @* Top Products *@
+        <div class="bg-white rounded-xl p-5 border border-gray-200">
+            <h3 class="font-semibold text-gray-800 mb-4 uppercase text-sm">Top Products</h3>
+            <div class="space-y-3">
+                @{
+                    var maxProd = data.TopProducts.Any() ? data.TopProducts.Max(p => (double)p.Revenue) : 1;
+                }
+                @foreach (var (prod, i) in data.TopProducts.Select((p, i) => (p, i)))
+                {
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-700 font-medium truncate max-w-[140px]">@prod.ProductName</span>
+                            <span class="text-gray-500">@FormatCurrencyShort(prod.Revenue)</span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2">
+                            <div class="h-2 rounded-full @TopProductColor(i)" style="width: @(maxProd > 0 ? (double)prod.Revenue * 100 / maxProd : 0)%"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ── Recent Orders ── *@
+    <div class="bg-white rounded-xl p-5 border border-gray-200">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-800 uppercase text-sm">Recent Orders</h3>
+            <a href="/sales" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">View all &rarr;</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[500px]">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                        <th class="px-4 py-2">Order #</th>
+                        <th class="px-4 py-2">Customer</th>
+                        <th class="px-4 py-2">Amount</th>
+                        <th class="px-4 py-2">Date</th>
+                        <th class="px-4 py-2">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in data.RecentOrders)
+                    {
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="px-4 py-2.5 text-sm font-mono font-medium text-indigo-600">@order.OrderNumber</td>
+                            <td class="px-4 py-2.5 text-sm text-gray-700">@order.CustomerName</td>
+                            <td class="px-4 py-2.5 text-sm font-semibold">@FormatCurrency(order.Amount)</td>
+                            <td class="px-4 py-2.5 text-xs text-gray-500">@order.OrderDate.ToString("MMM dd, yyyy")</td>
+                            <td class="px-4 py-2.5">
+                                <span class="px-2 py-0.5 rounded text-xs font-medium @OrderStatusColor(order.Status)">@order.Status</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private ErpDashboardData? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<ApiResponse<ErpDashboardData>>("/api/dashboard");
+        data = result?.Data;
+    }
+
+    private static string FormatCurrency(decimal value)
+    {
+        if (value >= 1_000_000) return $"${value / 1_000_000:F1}M";
+        if (value >= 1_000) return $"${value / 1_000:F1}K";
+        return $"${value:N0}";
+    }
+
+    private static string FormatCurrencyShort(decimal value) => FormatCurrency(value);
+
+    private static string TopProductColor(int index) => index switch
+    {
+        0 => "bg-indigo-500",
+        1 => "bg-blue-500",
+        2 => "bg-teal-500",
+        3 => "bg-green-500",
+        _ => "bg-gray-400"
+    };
+
+    private static string OrderStatusColor(string status) => status switch
+    {
+        "Delivered"  => "bg-green-100 text-green-700",
+        "Shipped"    => "bg-blue-100 text-blue-700",
+        "Processing" => "bg-indigo-100 text-indigo-700",
+        "Confirmed"  => "bg-teal-100 text-teal-700",
+        "Draft"      => "bg-gray-100 text-gray-600",
+        "Cancelled"  => "bg-red-100 text-red-700",
+        _            => "bg-gray-100 text-gray-600"
+    };
+}

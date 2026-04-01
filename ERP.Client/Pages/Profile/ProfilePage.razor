@@ -1,0 +1,84 @@
+@page "/profile"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+@inject AuthService Auth
+
+<PageTitle>Profile</PageTitle>
+
+@if (userInfo is not null)
+{
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 sm:p-6 mb-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+        <div class="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center text-2xl font-bold flex-shrink-0 overflow-hidden"
+             style="background-color: @RoleColor(userInfo.Role)">
+            @if (!string.IsNullOrEmpty(userInfo.AvatarUrl))
+            {
+                <img src="@userInfo.AvatarUrl" class="w-full h-full object-cover" alt="avatar" />
+            }
+            else
+            {
+                @Initials(userInfo)
+            }
+        </div>
+        <div class="min-w-0">
+            <h2 class="text-2xl font-bold">@userInfo.FullName</h2>
+            <p class="text-indigo-200 text-sm mt-0.5">@userInfo.Email</p>
+            <span class="inline-block mt-2 px-3 py-0.5 bg-white/20 rounded-full text-xs font-semibold">@userInfo.Role</span>
+        </div>
+    </div>
+}
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="t => activeTab = t" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4 sm:p-6">
+    @switch (activeTab)
+    {
+        case "Personal Info":
+            <PersonalInfo />;
+            break;
+        case "Password":
+            <PasswordChange />;
+            break;
+        case "Avatar":
+            <AvatarUpload />;
+            break;
+        case "Session":
+            <SessionView />;
+            break;
+    }
+</div>
+
+@code {
+    private string activeTab = "Personal Info";
+    private UserInfo? userInfo;
+
+    private Dictionary<string, string> tabs = new()
+    {
+        ["Personal Info"] = "badge",
+        ["Password"]      = "lock",
+        ["Avatar"]        = "account_circle",
+        ["Session"]       = "devices"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        userInfo = await Auth.GetUserInfoAsync();
+    }
+
+    private static string Initials(UserInfo u)
+    {
+        var f = u.FirstName?.FirstOrDefault();
+        var l = u.LastName?.FirstOrDefault();
+        return f.HasValue && l.HasValue ? $"{f}{l}" : u.Email?.Substring(0, 2).ToUpper() ?? "?";
+    }
+
+    private static string RoleColor(string? role) => role switch
+    {
+        "Super Admin"        => "#6366f1",
+        "Admin"              => "#8b5cf6",
+        "Finance Manager"    => "#2563eb",
+        "Sales Manager"      => "#22c55e",
+        "Inventory Manager"  => "#0d9488",
+        "Employee"           => "#f59e0b",
+        _                    => "#64748b"
+    };
+}

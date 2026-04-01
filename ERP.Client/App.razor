@@ -1,0 +1,30 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated == true)
+                    {
+                        <p class="text-center mt-20 text-gray-500">You are not authorized to view this page.</p>
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <div class="flex items-center justify-center h-screen bg-gray-50">
+                <div class="text-center">
+                    <h1 class="text-6xl font-bold text-gray-300">404</h1>
+                    <p class="text-gray-500 mt-4">Page not found</p>
+                    <a href="/" class="mt-6 inline-block px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Go Home</a>
+                </div>
+            </div>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

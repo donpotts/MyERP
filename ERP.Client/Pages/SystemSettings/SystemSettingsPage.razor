@@ -1,0 +1,492 @@
+@page "/system-settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Super Admin")]
+@inject ApiService Api
+
+<PageTitle>System Settings</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4 sm:p-6">
+    @switch (activeTab)
+    {
+        case "Identity":
+            <PageHeader Title="Identity Settings" Subtitle="Password policy, session timeouts, and authentication." />
+            @if (identitySettings is not null)
+            {
+                <div class="max-w-lg space-y-5">
+                    <SettingRow Label="Require Uppercase Letter" Description="Password must contain at least one uppercase letter.">
+                        <input type="checkbox" class="rounded" @bind="identitySettings.RequireUppercase" />
+                    </SettingRow>
+                    <SettingRow Label="Require Digit" Description="Password must contain at least one number.">
+                        <input type="checkbox" class="rounded" @bind="identitySettings.RequireDigit" />
+                    </SettingRow>
+                    <SettingRow Label="Require Special Character" Description="Password must contain at least one special character.">
+                        <input type="checkbox" class="rounded" @bind="identitySettings.RequireNonAlphanumeric" />
+                    </SettingRow>
+                    <SettingRow Label="Minimum Password Length" Description="Minimum number of characters required.">
+                        <input type="number" min="6" max="128" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="identitySettings.MinPasswordLength" />
+                    </SettingRow>
+                    <SettingRow Label="Max Failed Login Attempts" Description="Account locked after this many failures (0 = disabled).">
+                        <input type="number" min="0" max="20" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="identitySettings.MaxFailedAttempts" />
+                    </SettingRow>
+                    <SettingRow Label="Lockout Duration (minutes)" Description="How long accounts are locked after max failed attempts.">
+                        <input type="number" min="1" max="1440" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="identitySettings.LockoutMinutes" />
+                    </SettingRow>
+                    <SettingRow Label="JWT Token Expiry (hours)" Description="How long JWT access tokens remain valid.">
+                        <input type="number" min="1" max="720" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="identitySettings.TokenExpiryHours" />
+                    </SettingRow>
+                    <div class="flex justify-end pt-2">
+                        <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                @onclick='() => SaveSettings("identity", identitySettings)'>
+                            Save Identity Settings
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Database":
+            <PageHeader Title="Database Settings" Subtitle="Connection string and migration management." />
+            @if (dbSettings is not null)
+            {
+                <div class="max-w-lg space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Connection String</label>
+                        <textarea class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                  rows="3" @bind="dbSettings.ConnectionString"></textarea>
+                        <p class="text-xs text-gray-400 mt-1">Changes require application restart.</p>
+                    </div>
+                    <SettingRow Label="Command Timeout (seconds)" Description="Maximum time for database queries.">
+                        <input type="number" min="5" max="300" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="dbSettings.CommandTimeoutSeconds" />
+                    </SettingRow>
+                    <SettingRow Label="Enable Sensitive Data Logging" Description="Log SQL parameter values (development only).">
+                        <input type="checkbox" class="rounded" @bind="dbSettings.EnableSensitiveLogging" />
+                    </SettingRow>
+                    <div class="border-t border-gray-100 pt-4">
+                        <p class="text-sm font-medium text-gray-700 mb-3">Migrations</p>
+                        <div class="flex gap-3">
+                            <button class="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                                    @onclick="CheckMigrations">
+                                <span class="material-icons-outlined text-base">fact_check</span> Check Status
+                            </button>
+                            <button class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                    @onclick="RunMigrations">
+                                <span class="material-icons-outlined text-base">upgrade</span> Apply Migrations
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(migrationStatus))
+                        {
+                            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs font-mono text-blue-800">@migrationStatus</div>
+                        }
+                    </div>
+                    <div class="flex justify-end">
+                        <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                @onclick='() => SaveSettings("database", dbSettings)'>
+                            Save Database Settings
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Email":
+            <PageHeader Title="Email Settings" Subtitle="SMTP configuration for outgoing emails." />
+            @if (emailSettings is not null)
+            {
+                <div class="max-w-lg space-y-4">
+                    <SettingRow Label="Enable Email" Description="Enable SMTP email delivery.">
+                        <input type="checkbox" class="rounded" @bind="emailSettings.Enabled" />
+                    </SettingRow>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
+                        <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="emailSettings.SmtpHost" placeholder="smtp.gmail.com" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                            <input type="number" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   @bind="emailSettings.SmtpPort" />
+                        </div>
+                        <div class="flex items-end pb-2">
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" class="rounded" @bind="emailSettings.UseSsl" /> Enable SSL
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="emailSettings.Username" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="emailSettings.Password" placeholder="••••••••" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">From Address</label>
+                        <input type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="emailSettings.FromAddress" placeholder="noreply@company.com" />
+                    </div>
+                    <div class="flex justify-between pt-2">
+                        <button class="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                                @onclick="TestEmail">
+                            <span class="material-icons-outlined text-base">send</span> Test Email
+                        </button>
+                        <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                @onclick='() => SaveSettings("email", emailSettings)'>
+                            Save Email Settings
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Storage":
+            <PageHeader Title="Storage Settings" Subtitle="File storage configuration for uploads and attachments." />
+            @if (storageSettings is not null)
+            {
+                <div class="max-w-lg space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Storage Provider</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            @foreach (var p in new[] { "Local", "Azure Blob", "AWS S3" })
+                            {
+                                <button type="button"
+                                        class="px-3 py-2 text-sm rounded-lg border-2 transition-all @(storageSettings.Provider == p ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 hover:border-gray-300")"
+                                        @onclick="() => storageSettings.Provider = p">
+                                    @p
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    @if (storageSettings.Provider == "Local")
+                    {
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Upload Path</label>
+                            <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   @bind="storageSettings.LocalPath" placeholder="/var/uploads" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Connection String / Bucket</label>
+                            <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   @bind="storageSettings.ConnectionString" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Container / Bucket Name</label>
+                            <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   @bind="storageSettings.ContainerName" />
+                        </div>
+                    }
+                    <SettingRow Label="Max Upload Size (MB)" Description="Maximum file upload size in megabytes.">
+                        <input type="number" min="1" max="500" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="storageSettings.MaxFileSizeMb" />
+                    </SettingRow>
+                    <div class="flex justify-end pt-2">
+                        <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                @onclick='() => SaveSettings("storage", storageSettings)'>
+                            Save Storage Settings
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Jobs":
+            <PageHeader Title="Background Jobs" Subtitle="Scheduled task configuration and job history." />
+            @if (jobs is not null)
+            {
+                <div class="space-y-3">
+                    @foreach (var job in jobs)
+                    {
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-gray-200 rounded-xl">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-semibold text-gray-800">@job.Name</span>
+                                    <span class="px-2 py-0.5 text-xs rounded-full @(job.IsEnabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")">
+                                        @(job.IsEnabled ? "Enabled" : "Disabled")
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-0.5">@job.Description</p>
+                                <p class="text-xs text-gray-400 mt-1">Last run: @(job.LastRun?.ToString("MMM dd, HH:mm") ?? "Never") · Schedule: <span class="font-mono">@job.CronExpression</span></p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50"
+                                        @onclick="() => RunJobNow(job)">
+                                    <span class="material-icons-outlined text-sm">play_arrow</span>
+                                </button>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" @bind="job.IsEnabled" @bind:after="() => ToggleJob(job)" />
+                                    <div class="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Logging":
+            <PageHeader Title="Logging Configuration" Subtitle="Log levels, sinks, and retention policy." />
+            @if (loggingSettings is not null)
+            {
+                <div class="max-w-lg space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Default Log Level</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            @foreach (var lvl in new[] { "Debug", "Information", "Warning", "Error" })
+                            {
+                                <button type="button"
+                                        class="px-3 py-2 text-xs rounded-lg border-2 transition-all @(loggingSettings.DefaultLevel == lvl ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 hover:border-gray-300")"
+                                        @onclick="() => loggingSettings.DefaultLevel = lvl">
+                                    @lvl
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <SettingRow Label="Enable Database Logging" Description="Store log entries in the database.">
+                        <input type="checkbox" class="rounded" @bind="loggingSettings.EnableDatabase" />
+                    </SettingRow>
+                    <SettingRow Label="Enable File Logging" Description="Write log entries to rolling log files.">
+                        <input type="checkbox" class="rounded" @bind="loggingSettings.EnableFile" />
+                    </SettingRow>
+                    @if (loggingSettings.EnableFile)
+                    {
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Log File Path</label>
+                            <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   @bind="loggingSettings.LogFilePath" placeholder="logs/erp-.log" />
+                        </div>
+                    }
+                    <SettingRow Label="Retention (days)" Description="Delete logs older than this many days.">
+                        <input type="number" min="1" max="365" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="loggingSettings.RetentionDays" />
+                    </SettingRow>
+                    <div class="flex justify-end pt-2">
+                        <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                                @onclick='() => SaveSettings("logging", loggingSettings)'>
+                            Save Logging Settings
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+
+    @if (!string.IsNullOrEmpty(saveMessage))
+    {
+        <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+            <span class="material-icons-outlined text-base">check_circle</span> @saveMessage
+        </div>
+    }
+</div>
+
+@code {
+    private string activeTab = "Identity";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Identity"] = "security",
+        ["Database"] = "storage",
+        ["Email"]    = "email",
+        ["Storage"]  = "folder",
+        ["Jobs"]     = "schedule",
+        ["Logging"]  = "article"
+    };
+
+    private IdentitySettingsDto? identitySettings;
+    private DatabaseSettingsDto? dbSettings;
+    private EmailSettingsDto? emailSettings;
+    private StorageSettingsDto? storageSettings;
+    private List<BackgroundJobDto>? jobs;
+    private LoggingSettingsDto? loggingSettings;
+
+    private string saveMessage = "";
+    private string migrationStatus = "";
+
+    protected override async Task OnInitializedAsync() => await LoadTab();
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Identity": await LoadIdentity(); break;
+            case "Database": await LoadDatabase(); break;
+            case "Email":    await LoadEmail(); break;
+            case "Storage":  await LoadStorage(); break;
+            case "Jobs":     await LoadJobs(); break;
+            case "Logging":  await LoadLogging(); break;
+        }
+    }
+
+    private async Task LoadIdentity()
+    {
+        identitySettings = null;
+        var r = await Api.GetAsync<ApiResponse<IdentitySettingsDto>>("/api/system-settings/identity");
+        identitySettings = r?.Data ?? new();
+    }
+
+    private async Task LoadDatabase()
+    {
+        dbSettings = null;
+        var r = await Api.GetAsync<ApiResponse<DatabaseSettingsDto>>("/api/system-settings/database");
+        dbSettings = r?.Data ?? new();
+    }
+
+    private async Task LoadEmail()
+    {
+        emailSettings = null;
+        var r = await Api.GetAsync<ApiResponse<EmailSettingsDto>>("/api/system-settings/email");
+        emailSettings = r?.Data ?? new();
+    }
+
+    private async Task LoadStorage()
+    {
+        storageSettings = null;
+        var r = await Api.GetAsync<ApiResponse<StorageSettingsDto>>("/api/system-settings/storage");
+        storageSettings = r?.Data ?? new();
+    }
+
+    private async Task LoadJobs()
+    {
+        jobs = null;
+        var r = await Api.GetAsync<ApiResponse<List<BackgroundJobDto>>>("/api/system-settings/jobs");
+        jobs = r?.Data ?? new();
+    }
+
+    private async Task LoadLogging()
+    {
+        loggingSettings = null;
+        var r = await Api.GetAsync<ApiResponse<LoggingSettingsDto>>("/api/system-settings/logging");
+        loggingSettings = r?.Data ?? new();
+    }
+
+    private async Task SaveSettings<T>(string section, T data)
+    {
+        saveMessage = "";
+        await Api.PutAsync<T, ApiResponse<object>>($"/api/system-settings/{section}", data!);
+        saveMessage = $"{activeTab} settings saved successfully.";
+        StateHasChanged();
+        await Task.Delay(3000);
+        saveMessage = "";
+    }
+
+    private async Task CheckMigrations()
+    {
+        var r = await Api.GetAsync<ApiResponse<string>>("/api/system-settings/migrations/status");
+        migrationStatus = r?.Data ?? "Unable to check migration status.";
+    }
+
+    private async Task RunMigrations()
+    {
+        var r = await Api.PostAsync<object, ApiResponse<string>>("/api/system-settings/migrations/apply", new { });
+        migrationStatus = r?.Data ?? "Migration complete.";
+    }
+
+    private async Task TestEmail()
+    {
+        await Api.PostAsync<EmailSettingsDto, ApiResponse<object>>("/api/system-settings/email/test", emailSettings!);
+        saveMessage = "Test email sent — check your inbox.";
+    }
+
+    private async Task RunJobNow(BackgroundJobDto job)
+    {
+        await Api.PostAsync<object, ApiResponse<object>>($"/api/system-settings/jobs/{job.Id}/run", new { });
+        job.LastRun = DateTime.UtcNow;
+    }
+
+    private async Task ToggleJob(BackgroundJobDto job)
+    {
+        await Api.PutAsync<BackgroundJobDto, ApiResponse<object>>($"/api/system-settings/jobs/{job.Id}", job);
+    }
+
+    // Local DTOs
+    private class IdentitySettingsDto
+    {
+        public bool RequireUppercase       { get; set; } = true;
+        public bool RequireDigit           { get; set; } = true;
+        public bool RequireNonAlphanumeric { get; set; }
+        public int  MinPasswordLength      { get; set; } = 8;
+        public int  MaxFailedAttempts      { get; set; } = 5;
+        public int  LockoutMinutes         { get; set; } = 15;
+        public int  TokenExpiryHours       { get; set; } = 8;
+    }
+
+    private class DatabaseSettingsDto
+    {
+        public string ConnectionString      { get; set; } = "";
+        public int    CommandTimeoutSeconds { get; set; } = 30;
+        public bool   EnableSensitiveLogging{ get; set; }
+    }
+
+    private class EmailSettingsDto
+    {
+        public bool   Enabled     { get; set; }
+        public string SmtpHost    { get; set; } = "";
+        public int    SmtpPort    { get; set; } = 587;
+        public bool   UseSsl      { get; set; } = true;
+        public string Username    { get; set; } = "";
+        public string Password    { get; set; } = "";
+        public string FromAddress { get; set; } = "";
+    }
+
+    private class StorageSettingsDto
+    {
+        public string Provider         { get; set; } = "Local";
+        public string LocalPath        { get; set; } = "wwwroot/uploads";
+        public string ConnectionString { get; set; } = "";
+        public string ContainerName    { get; set; } = "";
+        public int    MaxFileSizeMb    { get; set; } = 10;
+    }
+
+    private class BackgroundJobDto
+    {
+        public string    Id             { get; set; } = "";
+        public string    Name           { get; set; } = "";
+        public string    Description    { get; set; } = "";
+        public string    CronExpression { get; set; } = "";
+        public bool      IsEnabled      { get; set; }
+        public DateTime? LastRun        { get; set; }
+    }
+
+    private class LoggingSettingsDto
+    {
+        public string DefaultLevel    { get; set; } = "Information";
+        public bool   EnableDatabase  { get; set; } = true;
+        public bool   EnableFile      { get; set; }
+        public string LogFilePath     { get; set; } = "logs/erp-.log";
+        public int    RetentionDays   { get; set; } = 30;
+    }
+}

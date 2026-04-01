@@ -1,0 +1,506 @@
+@page "/procurement"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>Procurement</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
+    @switch (activeTab)
+    {
+        case "Vendors":
+            <PageHeader Title="Vendors" Subtitle="Manage your supplier relationships.">
+                <Breadcrumb><span>/ Procurement / <strong>Vendors</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowVendorModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Vendor
+                    </button>
+                </Actions>
+            </PageHeader>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input @bind="search" @bind:event="oninput" @onkeyup="OnSearch" placeholder="Search vendors..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-64" />
+                <button @onclick="LoadVendors" class="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                    <span class="material-icons-outlined text-sm">refresh</span>
+                </button>
+            </div>
+            @if (vendors?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Code</th>
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Email</th>
+                                <th class="px-4 py-3">Phone</th>
+                                <th class="px-4 py-3">City</th>
+                                <th class="px-4 py-3">Total Purchases</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in vendors.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@v.Code</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@v.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@v.Email</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@v.Phone</td>
+                                    <td class="px-4 py-3 text-sm">@v.City</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@v.TotalPurchases.ToString("C0")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @(v.IsActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")">@(v.IsActive ? "Active" : "Inactive")</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowVendorModal(v)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="vendorPage" PageSize="vendorPageSize" TotalCount="vendors.TotalCount"
+                            PageChanged="async p => { vendorPage = p; await LoadVendors(); }"
+                            PageSizeChanged="async s => { vendorPageSize = s; vendorPage = 1; await LoadVendors(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Purchase Orders":
+            <PageHeader Title="Purchase Orders" Subtitle="Track and manage purchase orders.">
+                <Breadcrumb><span>/ Procurement / <strong>Purchase Orders</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowPOModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New PO
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (purchaseOrders?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">PO #</th>
+                                <th class="px-4 py-3">Vendor</th>
+                                <th class="px-4 py-3">Warehouse</th>
+                                <th class="px-4 py-3">Order Date</th>
+                                <th class="px-4 py-3">Expected</th>
+                                <th class="px-4 py-3">Total</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var po in purchaseOrders.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@po.OrderNumber</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@po.VendorName</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@po.WarehouseName</td>
+                                    <td class="px-4 py-3 text-sm">@po.OrderDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm">@(po.ExpectedDate?.ToString("MMM dd, yyyy") ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@po.TotalAmount.ToString("C2")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @POStatusColor(po.Status.ToString())">@po.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowPOModal(po)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="poPage" PageSize="poPageSize" TotalCount="purchaseOrders.TotalCount"
+                            PageChanged="async p => { poPage = p; await LoadPurchaseOrders(); }"
+                            PageSizeChanged="async s => { poPageSize = s; poPage = 1; await LoadPurchaseOrders(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Goods Receipts":
+            <PageHeader Title="Goods Receipts" Subtitle="Record received goods from vendors.">
+                <Breadcrumb><span>/ Procurement / <strong>Goods Receipts</strong></span></Breadcrumb>
+            </PageHeader>
+            @if (goodsReceipts?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Receipt #</th>
+                                <th class="px-4 py-3">PO #</th>
+                                <th class="px-4 py-3">Warehouse</th>
+                                <th class="px-4 py-3">Receipt Date</th>
+                                <th class="px-4 py-3">Items</th>
+                                <th class="px-4 py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var gr in goodsReceipts.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@gr.ReceiptNumber</td>
+                                    <td class="px-4 py-3 text-sm font-mono text-gray-500">@gr.PurchaseOrderNumber</td>
+                                    <td class="px-4 py-3 text-sm">@gr.WarehouseName</td>
+                                    <td class="px-4 py-3 text-sm">@gr.ReceiptDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm">@gr.Lines.Count lines</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @GRStatusColor(gr.Status.ToString())">@gr.Status</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="grPage" PageSize="grPageSize" TotalCount="goodsReceipts.TotalCount"
+                            PageChanged="async p => { grPage = p; await LoadGoodsReceipts(); }"
+                            PageSizeChanged="async s => { grPageSize = s; grPage = 1; await LoadGoodsReceipts(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+</div>
+
+@* Vendor Modal *@
+<Modal IsVisible="showVendorModal" Title='@(editVendor?.Id > 0 ? "Edit Vendor" : "New Vendor")' OnClose="() => showVendorModal = false">
+    <ChildContent>
+    @if (editVendor is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input @bind="editVendor.Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="VND-001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                    <select @bind="editVendor.PaymentTerms" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Net 30</option><option>Net 15</option><option>Net 60</option><option>Due on Receipt</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Vendor Name</label>
+                <input @bind="editVendor.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input @bind="editVendor.Email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input @bind="editVendor.Phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input @bind="editVendor.City" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <input @bind="editVendor.Country" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea @bind="editVendor.Notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveVendor" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showVendorModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Purchase Order Modal *@
+<Modal IsVisible="showPOModal_flag" Title='@(editPO?.Id > 0 ? "Edit Purchase Order" : "New Purchase Order")' OnClose="() => showPOModal_flag = false">
+    <ChildContent>
+    @if (editPO is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Order Number</label>
+                    <input @bind="editPO.OrderNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="PO-0001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select @bind="editPO.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Draft</option>
+                        <option>Submitted</option>
+                        <option>Approved</option>
+                        <option>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+                    <select @bind="editPO.VendorId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="0">— Select Vendor —</option>
+                        @if (allVendors is not null)
+                        {
+                            @foreach (var v in allVendors)
+                            {
+                                <option value="@v.Id">@v.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Warehouse</label>
+                    <select @bind="editPO.WarehouseId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="0">— Select Warehouse —</option>
+                        @if (allWarehouses is not null)
+                        {
+                            @foreach (var w in allWarehouses)
+                            {
+                                <option value="@w.Id">@w.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Order Date</label>
+                    <input type="date" @bind="editPO.OrderDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Expected Date</label>
+                    <input type="date" @bind="editPO.ExpectedDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sub Total</label>
+                    <input type="number" @bind="editPO.SubTotal" @bind:event="oninput" @onchange="RecalcPOTotal" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                    <input type="number" @bind="editPO.TaxAmount" @bind:event="oninput" @onchange="RecalcPOTotal" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+                    <input type="number" value="@editPO.TotalAmount" readonly class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 font-mono font-semibold" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea @bind="editPO.Notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SavePO" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showPOModal_flag = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@code {
+    private string activeTab = "Vendors";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Vendors"]         = "business",
+        ["Purchase Orders"] = "shopping_cart",
+        ["Goods Receipts"]  = "local_shipping"
+    };
+
+    private PagedResult<VendorDto>? vendors;
+    private string search = "";
+    private int vendorPage = 1, vendorPageSize = 10;
+    private bool showVendorModal;
+    private VendorEditModel? editVendor;
+
+    private PagedResult<PurchaseOrderDto>? purchaseOrders;
+    private int poPage = 1, poPageSize = 10;
+    private bool showPOModal_flag;
+    private POEditModel? editPO;
+    private List<VendorDto>? allVendors;
+    private List<WarehouseDto>? allWarehouses;
+
+    private PagedResult<GoodsReceiptDto>? goodsReceipts;
+    private int grPage = 1, grPageSize = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadTab(), LoadAllVendors(), LoadAllWarehouses());
+    }
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Vendors":         await LoadVendors(); break;
+            case "Purchase Orders": await LoadPurchaseOrders(); break;
+            case "Goods Receipts":  await LoadGoodsReceipts(); break;
+        }
+    }
+
+    private async Task LoadVendors()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<VendorDto>>>($"/api/vendors?page={vendorPage}&pageSize={vendorPageSize}&search={search}");
+        vendors = r?.Data;
+    }
+
+    private async Task LoadPurchaseOrders()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<PurchaseOrderDto>>>($"/api/purchase-orders?page={poPage}&pageSize={poPageSize}");
+        purchaseOrders = r?.Data;
+    }
+
+    private async Task LoadGoodsReceipts()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<GoodsReceiptDto>>>($"/api/goods-receipts?page={grPage}&pageSize={grPageSize}");
+        goodsReceipts = r?.Data;
+    }
+
+    private async Task LoadAllVendors()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<VendorDto>>>("/api/vendors/all");
+        allVendors = r?.Data;
+    }
+
+    private async Task LoadAllWarehouses()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<WarehouseDto>>>("/api/warehouses/all");
+        allWarehouses = r?.Data;
+    }
+
+    private void OnSearch(KeyboardEventArgs e) { if (e.Key == "Enter") _ = LoadVendors(); }
+
+    private void ShowVendorModal(VendorDto? v = null)
+    {
+        editVendor = v is null ? new VendorEditModel() : new VendorEditModel { Id = v.Id, Code = v.Code, Name = v.Name, Email = v.Email, Phone = v.Phone, City = v.City, Country = v.Country, PaymentTerms = v.PaymentTerms, Notes = v.Notes };
+        showVendorModal = true;
+    }
+
+    private async Task SaveVendor()
+    {
+        if (editVendor is null) return;
+        var dto = new VendorDto { Id = editVendor.Id, Code = editVendor.Code, Name = editVendor.Name, Email = editVendor.Email, Phone = editVendor.Phone, City = editVendor.City, Country = editVendor.Country, PaymentTerms = editVendor.PaymentTerms, Notes = editVendor.Notes, IsActive = true };
+        if (editVendor.Id == 0) await Api.PostAsync<VendorDto, ApiResponse<VendorDto>>("/api/vendors", dto);
+        else await Api.PutAsync<VendorDto, ApiResponse<VendorDto>>($"/api/vendors/{editVendor.Id}", dto);
+        showVendorModal = false;
+        await LoadVendors();
+    }
+
+    private void ShowPOModal(PurchaseOrderDto? po = null)
+    {
+        editPO = po is null
+            ? new POEditModel { OrderDate = DateTime.Today, StatusStr = "Draft" }
+            : new POEditModel
+            {
+                Id           = po.Id,
+                OrderNumber  = po.OrderNumber,
+                VendorId     = po.VendorId,
+                WarehouseId  = po.WarehouseId,
+                OrderDate    = po.OrderDate,
+                ExpectedDate = po.ExpectedDate,
+                SubTotal     = po.SubTotal,
+                TaxAmount    = po.TaxAmount,
+                TotalAmount  = po.TotalAmount,
+                StatusStr    = po.Status.ToString(),
+                Notes        = po.Notes
+            };
+        showPOModal_flag = true;
+    }
+
+    private void RecalcPOTotal()
+    {
+        if (editPO is not null)
+            editPO.TotalAmount = editPO.SubTotal + editPO.TaxAmount;
+    }
+
+    private async Task SavePO()
+    {
+        if (editPO is null) return;
+        editPO.TotalAmount = editPO.SubTotal + editPO.TaxAmount;
+        var dto = new PurchaseOrderDto
+        {
+            Id           = editPO.Id,
+            OrderNumber  = editPO.OrderNumber ?? "",
+            VendorId     = editPO.VendorId,
+            WarehouseId  = editPO.WarehouseId,
+            OrderDate    = editPO.OrderDate,
+            ExpectedDate = editPO.ExpectedDate,
+            SubTotal     = editPO.SubTotal,
+            TaxAmount    = editPO.TaxAmount,
+            TotalAmount  = editPO.TotalAmount,
+            Notes        = editPO.Notes
+        };
+        if (editPO.Id == 0) await Api.PostAsync<PurchaseOrderDto, ApiResponse<PurchaseOrderDto>>("/api/purchase-orders", dto);
+        else await Api.PutAsync<PurchaseOrderDto, ApiResponse<PurchaseOrderDto>>($"/api/purchase-orders/{editPO.Id}", dto);
+        showPOModal_flag = false;
+        await LoadPurchaseOrders();
+    }
+
+    private static string POStatusColor(string s) => s switch
+    {
+        "Approved"          => "bg-green-100 text-green-700",
+        "Submitted"         => "bg-blue-100 text-blue-700",
+        "FullyReceived"     => "bg-teal-100 text-teal-700",
+        "PartiallyReceived" => "bg-yellow-100 text-yellow-700",
+        "Draft"             => "bg-gray-100 text-gray-500",
+        "Cancelled"         => "bg-red-100 text-red-600",
+        _                   => "bg-gray-100 text-gray-600"
+    };
+
+    private static string GRStatusColor(string s) => s switch
+    {
+        "Confirmed" => "bg-green-100 text-green-700",
+        "Draft"     => "bg-gray-100 text-gray-500",
+        "Cancelled" => "bg-red-100 text-red-600",
+        _           => "bg-gray-100 text-gray-600"
+    };
+
+    private class VendorEditModel
+    {
+        public int Id { get; set; }
+        public string? Code { get; set; }
+        public string Name { get; set; } = "";
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? City { get; set; }
+        public string? Country { get; set; }
+        public string? PaymentTerms { get; set; } = "Net 30";
+        public string? Notes { get; set; }
+    }
+
+    private class POEditModel
+    {
+        public int Id { get; set; }
+        public string? OrderNumber { get; set; }
+        public int VendorId { get; set; }
+        public int? WarehouseId { get; set; }
+        public DateTime OrderDate { get; set; } = DateTime.Today;
+        public DateTime? ExpectedDate { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string StatusStr { get; set; } = "Draft";
+        public string? Notes { get; set; }
+    }
+}

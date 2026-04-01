@@ -1,0 +1,571 @@
+﻿@page "/crm"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>CRM</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
+    @switch (activeTab)
+    {
+        case "Leads":
+            <PageHeader Title="Leads" Subtitle="Track and qualify potential customers.">
+                <Breadcrumb><span>/ CRM / <strong>Leads</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowLeadModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Lead
+                    </button>
+                </Actions>
+            </PageHeader>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input @bind="search" @bind:event="oninput" @onkeyup="OnSearch" placeholder="Search leads..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-64" />
+                <button @onclick="LoadLeads" class="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                    <span class="material-icons-outlined text-sm">refresh</span>
+                </button>
+            </div>
+            @if (leads?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Company</th>
+                                <th class="px-4 py-3">Email</th>
+                                <th class="px-4 py-3">Source</th>
+                                <th class="px-4 py-3">Est. Value</th>
+                                <th class="px-4 py-3">Owner</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in leads.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-medium">@l.FullName</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(l.Company ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(l.Email ?? "—")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">@l.Source</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono">@(l.EstimatedValue.HasValue ? l.EstimatedValue.Value.ToString("C0") : "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(l.OwnerName ?? "—")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @LeadStatusColor(l.Status.ToString())">@l.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowLeadModal(l)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="leadPage" PageSize="leadPageSize" TotalCount="leads.TotalCount"
+                            PageChanged="async p => { leadPage = p; await LoadLeads(); }"
+                            PageSizeChanged="async s => { leadPageSize = s; leadPage = 1; await LoadLeads(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Contacts":
+            <PageHeader Title="Contacts" Subtitle="Your business contacts and relationships.">
+                <Breadcrumb><span>/ CRM / <strong>Contacts</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowContactModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Contact
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (contacts?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Job Title</th>
+                                <th class="px-4 py-3">Company</th>
+                                <th class="px-4 py-3">Email</th>
+                                <th class="px-4 py-3">Phone</th>
+                                <th class="px-4 py-3">City</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in contacts.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
+                                                @c.FirstName.FirstOrDefault()@c.LastName?.FirstOrDefault()
+                                            </div>
+                                            <span class="text-sm font-medium">@c.FullName</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(c.JobTitle ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm">@(c.Company ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(c.Email ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(c.Phone ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm">@(c.City ?? "—")</td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowContactModal(c)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="contactPage" PageSize="contactPageSize" TotalCount="contacts.TotalCount"
+                            PageChanged="async p => { contactPage = p; await LoadContacts(); }"
+                            PageSizeChanged="async s => { contactPageSize = s; contactPage = 1; await LoadContacts(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Opportunities":
+            <PageHeader Title="Opportunities" Subtitle="Track and close sales opportunities.">
+                <Breadcrumb><span>/ CRM / <strong>Opportunities</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowOpportunityModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Opportunity
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (opportunities?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Opportunity</th>
+                                <th class="px-4 py-3">Customer</th>
+                                <th class="px-4 py-3">Amount</th>
+                                <th class="px-4 py-3">Probability</th>
+                                <th class="px-4 py-3">Expected Revenue</th>
+                                <th class="px-4 py-3">Close Date</th>
+                                <th class="px-4 py-3">Stage</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in opportunities.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-medium">@o.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(o.CustomerName ?? o.ContactName ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@o.Amount.ToString("C0")</td>
+                                    <td class="px-4 py-3 text-sm text-center">@o.Probability.ToString("F0")%</td>
+                                    <td class="px-4 py-3 text-sm font-mono text-green-600">@o.ExpectedRevenue.ToString("C0")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(o.CloseDate?.ToString("MMM dd, yyyy") ?? "—")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @OpportunityStageColor(o.Stage.ToString())">@o.Stage</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowOpportunityModal(o)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="oppPage" PageSize="oppPageSize" TotalCount="opportunities.TotalCount"
+                            PageChanged="async p => { oppPage = p; await LoadOpportunities(); }"
+                            PageSizeChanged="async s => { oppPageSize = s; oppPage = 1; await LoadOpportunities(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Pipeline":
+            <PageHeader Title="Sales Pipeline" Subtitle="Visual overview of your sales pipeline." />
+            @if (pipeline is not null)
+            {
+                <div class="flex gap-4 overflow-x-auto pb-4">
+                    @foreach (var stage in pipeline)
+                    {
+                        <div class="flex-shrink-0 w-64">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-semibold text-gray-700">@stage.Stage</span>
+                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">@stage.Count</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mb-3">@stage.TotalAmount.ToString("C0")</div>
+                            <div class="space-y-2">
+                                @foreach (var opp in stage.Opportunities.Take(5))
+                                {
+                                    <div class="bg-white border border-gray-200 rounded-lg p-3 hover:border-indigo-200 transition shadow-sm">
+                                        <p class="text-sm font-medium text-gray-800 truncate">@opp.Name</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">@(opp.CustomerName ?? opp.ContactName ?? "—")</p>
+                                        <div class="flex items-center justify-between mt-2">
+                                            <span class="text-xs font-semibold text-indigo-600">@opp.Amount.ToString("C0")</span>
+                                            <span class="text-xs text-gray-400">@opp.Probability.ToString("F0")%</span>
+                                        </div>
+                                    </div>
+                                }
+                                @if (stage.Count > 5)
+                                {
+                                    <p class="text-xs text-center text-gray-400 py-2">+@(stage.Count - 5) more</p>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            break;
+    }
+</div>
+
+@* Lead Modal *@
+<Modal IsVisible="showLeadModal" Title='@(editLead?.Id > 0 ? "Edit Lead" : "New Lead")' OnClose="() => showLeadModal = false">
+    <ChildContent>
+    @if (editLead is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                    <input @bind="editLead.FirstName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                    <input @bind="editLead.LastName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input @bind="editLead.Email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input @bind="editLead.Phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <input @bind="editLead.Company" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <input @bind="editLead.JobTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                    <select @bind="editLead.SourceStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Website</option><option>Referral</option><option>Email</option><option>Phone</option><option>Social</option><option>Event</option><option>Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Est. Value</label>
+                    <input type="number" @bind="editLead.EstimatedValue" step="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea @bind="editLead.Notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveLead" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showLeadModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Contact Modal *@
+<Modal IsVisible="showContactModal" Title='@(editContact?.Id > 0 ? "Edit Contact" : "New Contact")' OnClose="() => showContactModal = false">
+    <ChildContent>
+    @if (editContact is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                    <input @bind="editContact.FirstName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                    <input @bind="editContact.LastName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input @bind="editContact.Email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input @bind="editContact.Phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <input @bind="editContact.Company" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <input @bind="editContact.JobTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input @bind="editContact.City" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <input @bind="editContact.Country" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveContact" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showContactModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Opportunity Modal *@
+<Modal IsVisible="showOppModal" Title='@(editOpportunity?.Id > 0 ? "Edit Opportunity" : "New Opportunity")' OnClose="() => showOppModal = false">
+    <ChildContent>
+    @if (editOpportunity is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Opportunity Name</label>
+                <input @bind="editOpportunity.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                    <input type="number" @bind="editOpportunity.Amount" step="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Probability (%)</label>
+                    <input type="number" @bind="editOpportunity.Probability" min="0" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                    <select @bind="editOpportunity.StageStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Prospecting</option><option>Qualification</option><option>Proposal</option><option>Negotiation</option><option>ClosedWon</option><option>ClosedLost</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Close Date</label>
+                    <input type="date" @bind="editOpportunity.CloseDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editOpportunity.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveOpportunity" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showOppModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@code {
+    private string activeTab = "Leads";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Leads"]         = "person_search",
+        ["Contacts"]      = "contacts",
+        ["Opportunities"] = "trending_up",
+        ["Pipeline"]      = "view_kanban"
+    };
+
+    private PagedResult<LeadDto>? leads;
+    private string search = "";
+    private int leadPage = 1, leadPageSize = 10;
+    private bool showLeadModal;
+    private LeadEditModel? editLead;
+
+    private PagedResult<ContactDto>? contacts;
+    private int contactPage = 1, contactPageSize = 10;
+    private bool showContactModal;
+    private ContactEditModel? editContact;
+
+    private PagedResult<OpportunityDto>? opportunities;
+    private int oppPage = 1, oppPageSize = 10;
+    private bool showOppModal;
+    private OpportunityEditModel? editOpportunity;
+
+    private List<PipelineStageDto>? pipeline;
+
+    protected override async Task OnInitializedAsync() => await LoadTab();
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Leads":         await LoadLeads(); break;
+            case "Contacts":      await LoadContacts(); break;
+            case "Opportunities": await LoadOpportunities(); break;
+            case "Pipeline":      await LoadPipeline(); break;
+        }
+    }
+
+    private async Task LoadLeads()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<LeadDto>>>($"/api/leads?page={leadPage}&pageSize={leadPageSize}&search={search}");
+        leads = r?.Data;
+    }
+
+    private async Task LoadContacts()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ContactDto>>>($"/api/contacts?page={contactPage}&pageSize={contactPageSize}&search={search}");
+        contacts = r?.Data;
+    }
+
+    private async Task LoadOpportunities()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<OpportunityDto>>>($"/api/opportunities?page={oppPage}&pageSize={oppPageSize}");
+        opportunities = r?.Data;
+    }
+
+    private async Task LoadPipeline()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<PipelineStageDto>>>("/api/pipeline");
+        pipeline = r?.Data;
+    }
+
+    private void OnSearch(KeyboardEventArgs e) { if (e.Key == "Enter") _ = LoadLeads(); }
+
+    private void ShowLeadModal(LeadDto? l = null)
+    {
+        editLead = l is null ? new LeadEditModel() : new LeadEditModel { Id = l.Id, FirstName = l.FirstName, LastName = l.LastName, Email = l.Email, Phone = l.Phone, Company = l.Company, JobTitle = l.JobTitle, SourceStr = l.Source.ToString(), EstimatedValue = l.EstimatedValue, Notes = l.Notes };
+        showLeadModal = true;
+    }
+
+    private async Task SaveLead()
+    {
+        if (editLead is null) return;
+        var dto = new LeadDto { Id = editLead.Id, FirstName = editLead.FirstName, LastName = editLead.LastName, Email = editLead.Email, Phone = editLead.Phone, Company = editLead.Company, JobTitle = editLead.JobTitle, EstimatedValue = editLead.EstimatedValue, Notes = editLead.Notes, Source = Enum.TryParse<LeadSource>(editLead.SourceStr, out var src) ? src : LeadSource.Website };
+        if (editLead.Id == 0) await Api.PostAsync<LeadDto, ApiResponse<LeadDto>>("/api/leads", dto);
+        else await Api.PutAsync<LeadDto, ApiResponse<LeadDto>>($"/api/leads/{editLead.Id}", dto);
+        showLeadModal = false;
+        await LoadLeads();
+    }
+
+    private void ShowContactModal(ContactDto? c = null)
+    {
+        editContact = c is null ? new ContactEditModel() : new ContactEditModel { Id = c.Id, FirstName = c.FirstName, LastName = c.LastName, Email = c.Email, Phone = c.Phone, Company = c.Company, JobTitle = c.JobTitle, City = c.City, Country = c.Country };
+        showContactModal = true;
+    }
+
+    private async Task SaveContact()
+    {
+        if (editContact is null) return;
+        var dto = new ContactDto { Id = editContact.Id, FirstName = editContact.FirstName, LastName = editContact.LastName, Email = editContact.Email, Phone = editContact.Phone, Company = editContact.Company, JobTitle = editContact.JobTitle, City = editContact.City, Country = editContact.Country };
+        if (editContact.Id == 0) await Api.PostAsync<ContactDto, ApiResponse<ContactDto>>("/api/contacts", dto);
+        else await Api.PutAsync<ContactDto, ApiResponse<ContactDto>>($"/api/contacts/{editContact.Id}", dto);
+        showContactModal = false;
+        await LoadContacts();
+    }
+
+    private void ShowOpportunityModal(OpportunityDto? o = null)
+    {
+        editOpportunity = o is null ? new OpportunityEditModel { CloseDate = DateTime.Today.AddDays(30) } : new OpportunityEditModel { Id = o.Id, Name = o.Name, Amount = o.Amount, Probability = o.Probability, StageStr = o.Stage.ToString(), CloseDate = o.CloseDate ?? DateTime.Today.AddDays(30), Description = o.Description };
+        showOppModal = true;
+    }
+
+    private async Task SaveOpportunity()
+    {
+        if (editOpportunity is null) return;
+        var dto = new OpportunityDto { Id = editOpportunity.Id, Name = editOpportunity.Name, Amount = editOpportunity.Amount, Probability = editOpportunity.Probability, ExpectedRevenue = editOpportunity.Amount * editOpportunity.Probability / 100, CloseDate = editOpportunity.CloseDate, Description = editOpportunity.Description, Stage = Enum.TryParse<OpportunityStage>(editOpportunity.StageStr, out var st) ? st : OpportunityStage.Prospecting };
+        if (editOpportunity.Id == 0) await Api.PostAsync<OpportunityDto, ApiResponse<OpportunityDto>>("/api/opportunities", dto);
+        else await Api.PutAsync<OpportunityDto, ApiResponse<OpportunityDto>>($"/api/opportunities/{editOpportunity.Id}", dto);
+        showOppModal = false;
+        await LoadOpportunities();
+    }
+
+    private static string LeadStatusColor(string s) => s switch
+    {
+        "Won"         => "bg-green-100 text-green-700",
+        "Qualified"   => "bg-blue-100 text-blue-700",
+        "Contacted"   => "bg-teal-100 text-teal-700",
+        "Proposal"    => "bg-purple-100 text-purple-700",
+        "Negotiation" => "bg-yellow-100 text-yellow-700",
+        "New"         => "bg-gray-100 text-gray-600",
+        "Lost"        => "bg-red-100 text-red-600",
+        _             => "bg-gray-100 text-gray-600"
+    };
+
+    private static string OpportunityStageColor(string s) => s switch
+    {
+        "ClosedWon"     => "bg-green-100 text-green-700",
+        "ClosedLost"    => "bg-red-100 text-red-600",
+        "Negotiation"   => "bg-orange-100 text-orange-700",
+        "Proposal"      => "bg-purple-100 text-purple-700",
+        "Qualification" => "bg-blue-100 text-blue-700",
+        "Prospecting"   => "bg-gray-100 text-gray-600",
+        _               => "bg-gray-100 text-gray-600"
+    };
+
+    private class LeadEditModel
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; } = "";
+        public string? LastName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Company { get; set; }
+        public string? JobTitle { get; set; }
+        public string SourceStr { get; set; } = "Website";
+        public decimal? EstimatedValue { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private class ContactEditModel
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; } = "";
+        public string? LastName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Company { get; set; }
+        public string? JobTitle { get; set; }
+        public string? City { get; set; }
+        public string? Country { get; set; }
+    }
+
+    private class OpportunityEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public decimal Amount { get; set; }
+        public decimal Probability { get; set; } = 50;
+        public string StageStr { get; set; } = "Prospecting";
+        public DateTime? CloseDate { get; set; }
+        public string? Description { get; set; }
+    }
+}

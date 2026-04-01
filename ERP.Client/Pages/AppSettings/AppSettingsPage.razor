@@ -1,0 +1,453 @@
+@page "/app-settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Super Admin,Admin")]
+@inject ApiService Api
+
+<PageTitle>App Settings</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4 sm:p-6">
+    @switch (activeTab)
+    {
+        case "Users":
+            <PageHeader Title="User Management" Subtitle="Manage application users and role assignments.">
+                <Breadcrumb>
+                    <span class="mx-1">/</span>
+                    <span>App Settings</span>
+                    <span class="mx-1">/</span>
+                    <span class="text-gray-700">Users</span>
+                </Breadcrumb>
+            </PageHeader>
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       placeholder="Search users..." @bind="userSearch" @bind:event="oninput" @onkeyup="OnUserSearch" />
+                <button class="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                        @onclick="OpenInviteModal">
+                    <span class="material-icons-outlined text-base">person_add</span>
+                    <span class="hidden sm:inline">Invite User</span>
+                </button>
+            </div>
+            @if (users is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">User</th>
+                                <th class="px-4 py-3">Email</th>
+                                <th class="px-4 py-3">Role</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in users.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-semibold text-indigo-700">
+                                                @u.FullName.FirstOrDefault()
+                                            </div>
+                                            <span class="text-sm font-medium text-gray-900">@u.FullName</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-600">@u.Email</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">@u.Role</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full @(u.IsActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")">
+                                            @(u.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-gray-400 hover:text-indigo-600 p-1" @onclick="() => EditUser(u)">
+                                            <span class="material-icons-outlined text-base">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="userPage" PageSize="pageSize" TotalCount="users.TotalCount"
+                            PageChanged="async p => { userPage = p; await LoadUsers(); }"
+                            PageSizeChanged="async s => { pageSize = s; userPage = 1; await LoadUsers(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Currencies":
+            <PageHeader Title="Currencies" Subtitle="Configure currencies and exchange rates." />
+            @if (currencies is not null)
+            {
+                <div class="mb-4 flex justify-end">
+                    <button class="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                            @onclick="OpenCurrencyModal">
+                        <span class="material-icons-outlined text-base">add</span> Add Currency
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[500px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Code</th>
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Symbol</th>
+                                <th class="px-4 py-3">Exchange Rate</th>
+                                <th class="px-4 py-3">Default</th>
+                                <th class="px-4 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in currencies)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-mono text-sm font-semibold">@c.Code</td>
+                                    <td class="px-4 py-3 text-sm">@c.Name</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@c.Symbol</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@c.ExchangeRate.ToString("F4")</td>
+                                    <td class="px-4 py-3">
+                                        @if (c.IsDefault)
+                                        {
+                                            <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Default</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-gray-400 hover:text-indigo-600 p-1" @onclick="() => EditCurrency(c)">
+                                            <span class="material-icons-outlined text-base">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "AutoNumber":
+            <PageHeader Title="Auto Numbering" Subtitle="Configure document number sequences." />
+            @if (autoNumbers is not null)
+            {
+                <div class="space-y-3">
+                    @foreach (var an in autoNumbers)
+                    {
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-800">@an.DocumentType</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Next: <span class="font-mono">@an.Prefix@an.NextNumber.ToString("D" + an.Padding.ToString())</span></p>
+                            </div>
+                            <div class="flex items-center gap-3 text-sm">
+                                <div class="flex items-center gap-1">
+                                    <span class="text-xs text-gray-500">Prefix</span>
+                                    <input class="w-20 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                           @bind="an.Prefix" />
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-xs text-gray-500">Next #</span>
+                                    <input type="number" class="w-20 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                           @bind="an.NextNumber" />
+                                </div>
+                                <button class="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700" @onclick="() => SaveAutoNumber(an)">Save</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Branding":
+            <BrandingSettings />
+            break;
+
+        case "Maintenance":
+            <PageHeader Title="Maintenance" Subtitle="Database maintenance, cache management, and system utilities." />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="material-icons-outlined text-2xl text-blue-500">cached</span>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-semibold text-gray-800">Clear Application Cache</h4>
+                            <p class="text-xs text-gray-500 mt-1 mb-3">Flush in-memory cache and reload configuration from database.</p>
+                            <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    @onclick='() => RunMaintenance("clear-cache")'>
+                                Clear Cache
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="material-icons-outlined text-2xl text-amber-500">compress</span>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-semibold text-gray-800">Optimize Database</h4>
+                            <p class="text-xs text-gray-500 mt-1 mb-3">Run index optimization and statistics update on all tables.</p>
+                            <button class="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                                    @onclick='() => RunMaintenance("optimize-db")'>
+                                Optimize
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="material-icons-outlined text-2xl text-green-500">backup</span>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-semibold text-gray-800">Export Data</h4>
+                            <p class="text-xs text-gray-500 mt-1 mb-3">Export all application data as a JSON or CSV backup.</p>
+                            <button class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                    @onclick='() => RunMaintenance("export")'>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="material-icons-outlined text-2xl text-red-500">delete_sweep</span>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-semibold text-gray-800">Purge Old Logs</h4>
+                            <p class="text-xs text-gray-500 mt-1 mb-3">Delete system log entries older than 90 days.</p>
+                            <button class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                    @onclick='() => RunMaintenance("purge-logs")'>
+                                Purge Logs
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(maintenanceMessage))
+            {
+                <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                    <span class="material-icons-outlined text-base">check_circle</span> @maintenanceMessage
+                </div>
+            }
+            break;
+    }
+</div>
+
+@* Invite User Modal *@
+<Modal IsVisible="showInviteModal" Title="Invite User" OnClose="() => showInviteModal = false">
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   @bind="inviteModel.FullName" placeholder="Jane Smith" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   @bind="inviteModel.Email" placeholder="jane@company.com" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    @bind="inviteModel.Role">
+                <option value="Employee">Employee</option>
+                <option value="Finance Manager">Finance Manager</option>
+                <option value="Sales Manager">Sales Manager</option>
+                <option value="Inventory Manager">Inventory Manager</option>
+                <option value="Admin">Admin</option>
+                <option value="Super Admin">Super Admin</option>
+            </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+            <button class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50" @onclick="() => showInviteModal = false">Cancel</button>
+            <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" @onclick="SaveUser">Send Invite</button>
+        </div>
+    </div>
+</Modal>
+
+@* Currency Modal *@
+<Modal IsVisible="showCurrencyModal" Title='@(editCurrency?.Id == 0 ? "Add Currency" : "Edit Currency")' OnClose="() => showCurrencyModal = false">
+    @if (editCurrency is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           @bind="editCurrency.Code" placeholder="USD" maxlength="3" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+                    <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           @bind="editCurrency.Symbol" placeholder="$" maxlength="5" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       @bind="editCurrency.Name" placeholder="US Dollar" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Exchange Rate (to base)</label>
+                <input type="number" step="0.0001" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       @bind="editCurrency.ExchangeRate" />
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="isDefault" class="rounded" @bind="editCurrency.IsDefault" />
+                <label for="isDefault" class="text-sm text-gray-700">Set as default currency</label>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50" @onclick="() => showCurrencyModal = false">Cancel</button>
+                <button class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" @onclick="SaveCurrency">Save</button>
+            </div>
+        </div>
+    }
+</Modal>
+
+@code {
+    private string activeTab = "Users";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Users"]       = "people",
+        ["Currencies"]  = "currency_exchange",
+        ["AutoNumber"]  = "tag",
+        ["Branding"]    = "palette",
+        ["Maintenance"] = "build"
+    };
+
+    // Users
+    private PagedResult<UserListItem>? users;
+    private string userSearch = "";
+    private int userPage = 1;
+    private int pageSize = 20;
+    private bool showInviteModal;
+    private UserInviteModel inviteModel = new();
+    private UserListItem? editingUser;
+
+    // Currencies
+    private List<CurrencyDto>? currencies;
+    private bool showCurrencyModal;
+    private CurrencyDto? editCurrency;
+
+    // Auto Numbers
+    private List<AutoNumberDto>? autoNumbers;
+
+    // Maintenance
+    private string maintenanceMessage = "";
+
+    protected override async Task OnInitializedAsync() => await LoadTab();
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Users":       await LoadUsers(); break;
+            case "Currencies":  await LoadCurrencies(); break;
+            case "AutoNumber":  await LoadAutoNumbers(); break;
+            case "Branding":    break;
+            case "Maintenance": break;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        users = null;
+        var url = $"/api/admin/users?page={userPage}&pageSize={pageSize}&search={Uri.EscapeDataString(userSearch)}";
+        var r = await Api.GetAsync<ApiResponse<PagedResult<UserListItem>>>(url);
+        users = r?.Data ?? new PagedResult<UserListItem>();
+    }
+
+    private async Task LoadCurrencies()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<CurrencyDto>>>("/api/settings/currencies");
+        currencies = r?.Data ?? new();
+    }
+
+    private async Task LoadAutoNumbers()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<AutoNumberDto>>>("/api/settings/auto-numbers");
+        autoNumbers = r?.Data ?? new();
+    }
+
+    private async Task OnUserSearch()
+    {
+        userPage = 1;
+        await LoadUsers();
+    }
+
+    private void OpenInviteModal() { inviteModel = new(); showInviteModal = true; }
+    private void EditUser(UserListItem u) { inviteModel = new() { FullName = u.FullName, Email = u.Email, Role = u.Role }; editingUser = u; showInviteModal = true; }
+
+    private async Task SaveUser()
+    {
+        await Api.PostAsync<UserInviteModel, ApiResponse<object>>("/api/admin/users/invite", inviteModel);
+        showInviteModal = false;
+        await LoadUsers();
+    }
+
+    private void OpenCurrencyModal() { editCurrency = new CurrencyDto(); showCurrencyModal = true; }
+    private void EditCurrency(CurrencyDto c) { editCurrency = new CurrencyDto { Id = c.Id, Code = c.Code, Name = c.Name, Symbol = c.Symbol, ExchangeRate = c.ExchangeRate, IsDefault = c.IsDefault }; showCurrencyModal = true; }
+
+    private async Task SaveCurrency()
+    {
+        if (editCurrency!.Id == 0)
+            await Api.PostAsync<CurrencyDto, ApiResponse<object>>("/api/settings/currencies", editCurrency);
+        else
+            await Api.PutAsync<CurrencyDto, ApiResponse<object>>($"/api/settings/currencies/{editCurrency.Id}", editCurrency);
+        showCurrencyModal = false;
+        await LoadCurrencies();
+    }
+
+    private async Task SaveAutoNumber(AutoNumberDto an)
+    {
+        await Api.PutAsync<AutoNumberDto, ApiResponse<object>>($"/api/settings/auto-numbers/{an.DocumentType}", an);
+    }
+
+    private async Task RunMaintenance(string action)
+    {
+        maintenanceMessage = "";
+        var r = await Api.PostAsync<object, ApiResponse<string>>($"/api/settings/maintenance/{action}", new { });
+        maintenanceMessage = r?.Data ?? "Operation completed.";
+    }
+
+    // Local DTOs
+    private class UserListItem
+    {
+        public string Id       { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string Email    { get; set; } = "";
+        public string Role     { get; set; } = "";
+        public bool   IsActive { get; set; }
+    }
+
+    private class UserInviteModel
+    {
+        public string FullName { get; set; } = "";
+        public string Email    { get; set; } = "";
+        public string Role     { get; set; } = "Employee";
+    }
+
+    private class CurrencyDto
+    {
+        public int     Id           { get; set; }
+        public string  Code         { get; set; } = "";
+        public string  Name         { get; set; } = "";
+        public string  Symbol       { get; set; } = "";
+        public decimal ExchangeRate { get; set; } = 1;
+        public bool    IsDefault    { get; set; }
+    }
+
+    private class AutoNumberDto
+    {
+        public string DocumentType { get; set; } = "";
+        public string Prefix       { get; set; } = "";
+        public int    NextNumber   { get; set; }
+        public int    Padding      { get; set; } = 4;
+    }
+}

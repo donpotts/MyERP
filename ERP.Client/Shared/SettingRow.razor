@@ -1,0 +1,26 @@
+<div class="flex items-start justify-between px-6 py-3 border-b border-gray-200 last:border-b-0">
+    <div class="flex-1 min-w-0 pr-4">
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wider">@Label</span>
+        @if (!string.IsNullOrEmpty(Description))
+        {
+            <p class="text-xs text-gray-400 mt-0.5">@Description</p>
+        }
+        @if (!string.IsNullOrEmpty(Value))
+        {
+            <span class="text-sm text-gray-800 font-mono block mt-0.5">@Value</span>
+        }
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="flex-shrink-0 mt-0.5">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

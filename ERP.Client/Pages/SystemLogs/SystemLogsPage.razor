@@ -1,0 +1,193 @@
+@page "/system-logs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Super Admin,Admin")]
+@inject ApiService Api
+
+<PageTitle>System Logs</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; page = 1; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4 sm:p-6">
+    @switch (activeTab)
+    {
+        case "Database":
+            <PageHeader Title="Database Logs" Subtitle="EF Core queries, migrations, and database activity." />
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       placeholder="Search logs..." @bind="search" @bind:event="oninput" @onkeyup="OnSearch" />
+                <select class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        @bind="levelFilter" @bind:after="async () => { page = 1; await LoadTab(); }">
+                    <option value="">All Levels</option>
+                    <option value="Information">Information</option>
+                    <option value="Warning">Warning</option>
+                    <option value="Error">Error</option>
+                    <option value="Debug">Debug</option>
+                </select>
+                <button class="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                        @onclick="async () => { await LoadTab(); }">
+                    <span class="material-icons-outlined text-base">refresh</span> Refresh
+                </button>
+            </div>
+            @if (dbLogs is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Timestamp</th>
+                                <th class="px-4 py-3">Level</th>
+                                <th class="px-4 py-3">Category</th>
+                                <th class="px-4 py-3">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in dbLogs.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap font-mono">@log.Timestamp.ToString("MM/dd HH:mm:ss")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full @GetLevelClass(log.Level)">@log.Level</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate font-mono">@log.Category</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 max-w-xs truncate" title="@log.Message">@log.Message</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="page" PageSize="pageSize" TotalCount="dbLogs.TotalCount" PageChanged="async p => { page = p; await LoadTab(); }" PageSizeChanged="async s => { pageSize = s; page = 1; await LoadTab(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "File":
+            <PageHeader Title="File Logs" Subtitle="Application log files written to disk." />
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       placeholder="Search logs..." @bind="search" @bind:event="oninput" @onkeyup="OnSearch" />
+                <select class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        @bind="levelFilter" @bind:after="async () => { page = 1; await LoadTab(); }">
+                    <option value="">All Levels</option>
+                    <option value="Information">Information</option>
+                    <option value="Warning">Warning</option>
+                    <option value="Error">Error</option>
+                    <option value="Debug">Debug</option>
+                </select>
+                <button class="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+                        @onclick="async () => { await LoadTab(); }">
+                    <span class="material-icons-outlined text-base">refresh</span> Refresh
+                </button>
+            </div>
+            @if (fileLogs is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Timestamp</th>
+                                <th class="px-4 py-3">Level</th>
+                                <th class="px-4 py-3">Source</th>
+                                <th class="px-4 py-3">Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in fileLogs.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap font-mono">@log.Timestamp.ToString("MM/dd HH:mm:ss")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full @GetLevelClass(log.Level)">@log.Level</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-xs text-gray-600 max-w-[160px] truncate font-mono">@log.Category</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 max-w-xs truncate" title="@log.Message">@log.Message</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="page" PageSize="pageSize" TotalCount="fileLogs.TotalCount" PageChanged="async p => { page = p; await LoadTab(); }" PageSizeChanged="async s => { pageSize = s; page = 1; await LoadTab(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+</div>
+
+@code {
+    private string activeTab = "Database";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Database"] = "storage",
+        ["File"]     = "description"
+    };
+
+    private PagedResult<LogEntryDto>? dbLogs;
+    private PagedResult<LogEntryDto>? fileLogs;
+    private string search = "";
+    private string levelFilter = "";
+    private int page = 1;
+    private int pageSize = 25;
+    private System.Threading.CancellationTokenSource? _searchCts;
+
+    protected override async Task OnInitializedAsync() => await LoadTab();
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Database": await LoadDbLogs(); break;
+            case "File":     await LoadFileLogs(); break;
+        }
+    }
+
+    private async Task LoadDbLogs()
+    {
+        dbLogs = null;
+        var url = $"/api/system-logs/database?page={page}&pageSize={pageSize}&search={Uri.EscapeDataString(search)}&level={Uri.EscapeDataString(levelFilter)}";
+        var r = await Api.GetAsync<ApiResponse<PagedResult<LogEntryDto>>>(url);
+        dbLogs = r?.Data ?? new PagedResult<LogEntryDto>();
+    }
+
+    private async Task LoadFileLogs()
+    {
+        fileLogs = null;
+        var url = $"/api/system-logs/file?page={page}&pageSize={pageSize}&search={Uri.EscapeDataString(search)}&level={Uri.EscapeDataString(levelFilter)}";
+        var r = await Api.GetAsync<ApiResponse<PagedResult<LogEntryDto>>>(url);
+        fileLogs = r?.Data ?? new PagedResult<LogEntryDto>();
+    }
+
+    private async Task OnSearch()
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = new System.Threading.CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchCts.Token);
+            page = 1;
+            await LoadTab();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private static string GetLevelClass(string level) => level switch
+    {
+        "Error"       => "bg-red-100 text-red-700",
+        "Warning"     => "bg-yellow-100 text-yellow-700",
+        "Information" => "bg-blue-100 text-blue-700",
+        "Debug"       => "bg-gray-100 text-gray-600",
+        _             => "bg-gray-100 text-gray-600"
+    };
+
+    private class LogEntryDto
+    {
+        public DateTime Timestamp { get; set; }
+        public string Level    { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Message  { get; set; } = "";
+    }
+}

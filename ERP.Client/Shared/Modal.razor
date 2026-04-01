@@ -1,0 +1,33 @@
+@if (IsVisible)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @onclick="Close">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl @WidthClass max-h-[90vh] overflow-y-auto" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-slate-100">@Title</h3>
+                <button @onclick="Close" class="text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200">
+                    <span class="material-icons-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-6">
+                @ChildContent
+            </div>
+            @if (Footer is not null)
+            {
+                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 rounded-b-lg">
+                    @Footer
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string WidthClass { get; set; } = "w-full max-w-[600px]";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+}

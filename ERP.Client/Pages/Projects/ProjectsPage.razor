@@ -1,0 +1,585 @@
+@page "/projects"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>Projects</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
+    @switch (activeTab)
+    {
+        case "Projects":
+            <PageHeader Title="Projects" Subtitle="Manage ongoing and planned projects.">
+                <Breadcrumb><span>/ Projects / <strong>All Projects</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowProjectModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Project
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (projects?.Items is not null)
+            {
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    @foreach (var p in projects.Items)
+                    {
+                        <div class="border border-gray-200 rounded-xl p-4 hover:border-indigo-200 transition">
+                            <div class="flex items-start justify-between mb-2">
+                                <div>
+                                    <h3 class="font-semibold text-gray-800">@p.Name</h3>
+                                    <p class="text-xs text-gray-400 font-mono">@p.Code</p>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-xs font-medium @ProjectStatusColor(p.Status.ToString()) flex-shrink-0 ml-2">@p.Status</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(p.CustomerName))
+                            {
+                                <p class="text-xs text-gray-500 mb-2"><span class="material-icons-outlined text-xs align-middle mr-1">people</span>@p.CustomerName</p>
+                            }
+                            <div class="flex justify-between text-xs text-gray-500 mb-2">
+                                <span>@p.StartDate.ToString("MMM dd") → @(p.EndDate?.ToString("MMM dd, yyyy") ?? "Ongoing")</span>
+                                <span class="font-semibold text-gray-700">@p.Budget.ToString("C0")</span>
+                            </div>
+                            @* Progress bar *@
+                            <div class="mt-2">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-500">@p.CompletedTaskCount / @p.TaskCount tasks</span>
+                                    <span class="font-semibold text-indigo-600">@p.CompletionPercent.ToString("F0")%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-indigo-500 h-2 rounded-full" style="width: @p.CompletionPercent%"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                                <span class="text-xs text-gray-400">@p.TotalHours.ToString("F1")h logged</span>
+                                <div class="flex items-center gap-2">
+                                    @if (!string.IsNullOrEmpty(p.ProjectManagerName))
+                                    {
+                                        <span class="text-xs text-gray-500">PM: @p.ProjectManagerName</span>
+                                    }
+                                    <button @onclick="() => ShowProjectModal(p)" class="text-gray-400 hover:text-indigo-600 ml-1">
+                                        <span class="material-icons-outlined text-sm">edit</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="mt-4">
+                    <Pagination Page="projectPage" PageSize="projectPageSize" TotalCount="projects.TotalCount"
+                                PageChanged="async p => { projectPage = p; await LoadProjects(); }"
+                                PageSizeChanged="async s => { projectPageSize = s; projectPage = 1; await LoadProjects(); }" />
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Tasks":
+            <PageHeader Title="Project Tasks" Subtitle="All tasks across projects.">
+                <Breadcrumb><span>/ Projects / <strong>Tasks</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowTaskModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Task
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (tasks?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Title</th>
+                                <th class="px-4 py-3">Project</th>
+                                <th class="px-4 py-3">Assignee</th>
+                                <th class="px-4 py-3">Priority</th>
+                                <th class="px-4 py-3">Due Date</th>
+                                <th class="px-4 py-3">Est. Hours</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in tasks.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-medium max-w-xs truncate">@t.Title</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@t.ProjectName</td>
+                                    <td class="px-4 py-3 text-sm">@(t.AssigneeName ?? "—")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @TaskPriorityColor(t.Priority.ToString())">@t.Priority</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm @(t.DueDate < DateTime.Now && t.Status.ToString() != "Done" ? "text-red-600 font-medium" : "text-gray-600")">
+                                        @(t.DueDate?.ToString("MMM dd, yyyy") ?? "—")
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono">@t.EstimatedHours.ToString("F1")h</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @TaskStatusColor(t.Status.ToString())">@t.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowTaskModal(t)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="taskPage" PageSize="taskPageSize" TotalCount="tasks.TotalCount"
+                            PageChanged="async p => { taskPage = p; await LoadTasks(); }"
+                            PageSizeChanged="async s => { taskPageSize = s; taskPage = 1; await LoadTasks(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Time Entries":
+            <PageHeader Title="Time Tracking" Subtitle="Logged time across all projects.">
+                <Breadcrumb><span>/ Projects / <strong>Time Entries</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowTimeEntryModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> Log Time
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (timeEntries?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Project</th>
+                                <th class="px-4 py-3">Task</th>
+                                <th class="px-4 py-3">User</th>
+                                <th class="px-4 py-3">Hours</th>
+                                <th class="px-4 py-3">Billable</th>
+                                <th class="px-4 py-3">Amount</th>
+                                <th class="px-4 py-3">Description</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var te in timeEntries.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm">@te.EntryDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@te.ProjectName</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">@(te.TaskTitle ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm">@te.UserName</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@te.Hours.ToString("F2")h</td>
+                                    <td class="px-4 py-3">
+                                        @if (te.IsBillable)
+                                        {
+                                            <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Billable</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">Non-Bill</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono">@(te.IsBillable ? te.BillableAmount.ToString("C2") : "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-400 max-w-xs truncate">@te.Description</td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowTimeEntryModal(te)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="timePage" PageSize="timePageSize" TotalCount="timeEntries.TotalCount"
+                            PageChanged="async p => { timePage = p; await LoadTimeEntries(); }"
+                            PageSizeChanged="async s => { timePageSize = s; timePage = 1; await LoadTimeEntries(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+</div>
+
+@* Project Modal *@
+<Modal IsVisible="showProjectModal" Title='@(editProject?.Id > 0 ? "Edit Project" : "New Project")' OnClose="() => showProjectModal = false">
+    <ChildContent>
+    @if (editProject is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                    <input @bind="editProject.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input @bind="editProject.Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="PROJ-001" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editProject.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input type="date" @bind="editProject.StartDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input type="date" @bind="editProject.EndDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Budget</label>
+                    <input type="number" @bind="editProject.Budget" step="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select @bind="editProject.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Planning</option><option>Active</option><option>OnHold</option><option>Completed</option><option>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveProject" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showProjectModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Time Entry Modal *@
+<Modal IsVisible="showTimeModal" Title='@(editTimeEntry?.Id > 0 ? "Edit Time Entry" : "Log Time")' OnClose="() => showTimeModal = false">
+    <ChildContent>
+    @if (editTimeEntry is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                <select @bind="editTimeEntry.ProjectId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="0">— Select Project —</option>
+                    @if (allProjects is not null)
+                    {
+                        @foreach (var p in allProjects)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
+                    <input type="date" @bind="editTimeEntry.EntryDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hours</label>
+                    <input type="number" @bind="editTimeEntry.Hours" step="0.25" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editTimeEntry.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="isBillable" @bind="editTimeEntry.IsBillable" class="rounded border-gray-300 text-indigo-600" />
+                <label for="isBillable" class="text-sm font-medium text-gray-700">Billable</label>
+            </div>
+            @if (editTimeEntry.IsBillable)
+            {
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hourly Rate</label>
+                    <input type="number" @bind="editTimeEntry.HourlyRate" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            }
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveTimeEntry" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showTimeModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Task Edit Modal *@
+<Modal IsVisible="showTaskModal" Title='@(editTask?.Id > 0 ? "Edit Task" : "New Task")' OnClose="() => showTaskModal = false">
+    <ChildContent>
+    @if (editTask is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input @bind="editTask.Title" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select @bind="editTask.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Todo</option>
+                        <option>InProgress</option>
+                        <option>Review</option>
+                        <option>Done</option>
+                        <option>Cancelled</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select @bind="editTask.PriorityStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                        <option>Critical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="date" @bind="editTask.DueDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
+                    <input type="number" @bind="editTask.EstimatedHours" step="0.5" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editTask.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveTask" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showTaskModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@code {
+    private string activeTab = "Projects";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Projects"]     = "folder_open",
+        ["Tasks"]        = "task_alt",
+        ["Time Entries"] = "timer"
+    };
+
+    private PagedResult<ProjectDto>? projects;
+    private int projectPage = 1, projectPageSize = 9;
+    private bool showProjectModal;
+    private ProjectEditModel? editProject;
+
+    private PagedResult<ProjectTaskDto>? tasks;
+    private int taskPage = 1, taskPageSize = 10;
+    private bool showTaskModal;
+    private TaskEditModel? editTask;
+
+    private PagedResult<TimeEntryDto>? timeEntries;
+    private int timePage = 1, timePageSize = 10;
+    private bool showTimeModal;
+    private TimeEntryEditModel? editTimeEntry;
+
+    private List<ProjectDto>? allProjects;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadTab(), LoadAllProjects());
+    }
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Projects":     await LoadProjects(); break;
+            case "Tasks":        await LoadTasks(); break;
+            case "Time Entries": await LoadTimeEntries(); break;
+        }
+    }
+
+    private async Task LoadProjects()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ProjectDto>>>($"/api/projects?page={projectPage}&pageSize={projectPageSize}");
+        projects = r?.Data;
+    }
+
+    private async Task LoadTasks()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ProjectTaskDto>>>($"/api/project-tasks?page={taskPage}&pageSize={taskPageSize}");
+        tasks = r?.Data;
+    }
+
+    private async Task LoadTimeEntries()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<TimeEntryDto>>>($"/api/time-entries?page={timePage}&pageSize={timePageSize}");
+        timeEntries = r?.Data;
+    }
+
+    private async Task LoadAllProjects()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ProjectDto>>>("/api/projects?page=1&pageSize=100");
+        allProjects = r?.Data?.Items?.ToList();
+    }
+
+    private void ShowProjectModal(ProjectDto? p = null)
+    {
+        editProject = p is null ? new ProjectEditModel { StartDate = DateTime.Today } :
+            new ProjectEditModel { Id = p.Id, Name = p.Name, Code = p.Code, Description = p.Description, StartDate = p.StartDate, EndDate = p.EndDate, Budget = p.Budget, StatusStr = p.Status.ToString() };
+        showProjectModal = true;
+    }
+
+    private async Task SaveProject()
+    {
+        if (editProject is null) return;
+        var dto = new ProjectDto { Id = editProject.Id, Name = editProject.Name, Code = editProject.Code, Description = editProject.Description, StartDate = editProject.StartDate, EndDate = editProject.EndDate, Budget = editProject.Budget };
+        if (editProject.Id == 0) await Api.PostAsync<ProjectDto, ApiResponse<ProjectDto>>("/api/projects", dto);
+        else await Api.PutAsync<ProjectDto, ApiResponse<ProjectDto>>($"/api/projects/{editProject.Id}", dto);
+        showProjectModal = false;
+        await LoadProjects();
+    }
+
+    private void ShowTimeEntryModal(TimeEntryDto? te = null)
+    {
+        editTimeEntry = te is null
+            ? new TimeEntryEditModel { EntryDate = DateTime.Today }
+            : new TimeEntryEditModel
+            {
+                Id          = te.Id,
+                ProjectId   = te.ProjectId,
+                EntryDate   = te.EntryDate,
+                Hours       = te.Hours,
+                Description = te.Description,
+                IsBillable  = te.IsBillable,
+                HourlyRate  = te.HourlyRate
+            };
+        showTimeModal = true;
+    }
+
+    private async Task SaveTimeEntry()
+    {
+        if (editTimeEntry is null) return;
+        var dto = new TimeEntryDto
+        {
+            Id          = editTimeEntry.Id,
+            ProjectId   = editTimeEntry.ProjectId,
+            EntryDate   = editTimeEntry.EntryDate,
+            Hours       = editTimeEntry.Hours,
+            Description = editTimeEntry.Description,
+            IsBillable  = editTimeEntry.IsBillable,
+            HourlyRate  = editTimeEntry.HourlyRate
+        };
+        if (editTimeEntry.Id == 0) await Api.PostAsync<TimeEntryDto, ApiResponse<TimeEntryDto>>("/api/time-entries", dto);
+        else await Api.PutAsync<TimeEntryDto, ApiResponse<TimeEntryDto>>($"/api/time-entries/{editTimeEntry.Id}", dto);
+        showTimeModal = false;
+        await LoadTimeEntries();
+    }
+
+    private void ShowTaskModal(ProjectTaskDto? t = null)
+    {
+        editTask = t is null
+            ? new TaskEditModel { StatusStr = "Todo", PriorityStr = "Medium" }
+            : new TaskEditModel
+            {
+                Id             = t.Id,
+                ProjectId      = t.ProjectId,
+                Title          = t.Title,
+                Description    = t.Description,
+                StatusStr      = t.Status.ToString(),
+                PriorityStr    = t.Priority.ToString(),
+                DueDate        = t.DueDate,
+                EstimatedHours = t.EstimatedHours
+            };
+        showTaskModal = true;
+    }
+
+    private async Task SaveTask()
+    {
+        if (editTask is null) return;
+        var dto = new ProjectTaskDto
+        {
+            Id             = editTask.Id,
+            ProjectId      = editTask.ProjectId,
+            Title          = editTask.Title,
+            Description    = editTask.Description,
+            DueDate        = editTask.DueDate,
+            EstimatedHours = editTask.EstimatedHours
+        };
+        if (editTask.Id == 0) await Api.PostAsync<ProjectTaskDto, ApiResponse<ProjectTaskDto>>("/api/project-tasks", dto);
+        else await Api.PutAsync<ProjectTaskDto, ApiResponse<ProjectTaskDto>>($"/api/project-tasks/{editTask.Id}", dto);
+        showTaskModal = false;
+        await LoadTasks();
+    }
+
+    private static string ProjectStatusColor(string s) => s switch
+    {
+        "Active"    => "bg-green-100 text-green-700",
+        "Planning"  => "bg-blue-100 text-blue-700",
+        "OnHold"    => "bg-yellow-100 text-yellow-700",
+        "Completed" => "bg-teal-100 text-teal-700",
+        "Cancelled" => "bg-red-100 text-red-600",
+        _           => "bg-gray-100 text-gray-600"
+    };
+
+    private static string TaskStatusColor(string s) => s switch
+    {
+        "Done"       => "bg-green-100 text-green-700",
+        "InProgress" => "bg-blue-100 text-blue-700",
+        "Review"     => "bg-purple-100 text-purple-700",
+        "Todo"       => "bg-gray-100 text-gray-600",
+        "Cancelled"  => "bg-red-100 text-red-600",
+        _            => "bg-gray-100 text-gray-600"
+    };
+
+    private static string TaskPriorityColor(string s) => s switch
+    {
+        "Critical" => "bg-red-100 text-red-700",
+        "High"     => "bg-orange-100 text-orange-700",
+        "Medium"   => "bg-yellow-100 text-yellow-700",
+        "Low"      => "bg-green-100 text-green-700",
+        _          => "bg-gray-100 text-gray-600"
+    };
+
+    private class ProjectEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Code { get; set; }
+        public string? Description { get; set; }
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime? EndDate { get; set; }
+        public decimal Budget { get; set; }
+        public string StatusStr { get; set; } = "Planning";
+    }
+
+    private class TimeEntryEditModel
+    {
+        public int Id { get; set; }
+        public int ProjectId { get; set; }
+        public DateTime EntryDate { get; set; } = DateTime.Today;
+        public decimal Hours { get; set; }
+        public string? Description { get; set; }
+        public bool IsBillable { get; set; }
+        public decimal HourlyRate { get; set; }
+    }
+
+    private class TaskEditModel
+    {
+        public int Id { get; set; }
+        public int ProjectId { get; set; }
+        public string Title { get; set; } = "";
+        public string? Description { get; set; }
+        public string StatusStr { get; set; } = "Todo";
+        public string PriorityStr { get; set; } = "Medium";
+        public DateTime? DueDate { get; set; }
+        public decimal EstimatedHours { get; set; }
+    }
+}

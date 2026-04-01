@@ -1,0 +1,572 @@
+﻿@page "/inventory"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>Inventory</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
+    @switch (activeTab)
+    {
+        case "Products":
+            <PageHeader Title="Products" Subtitle="Manage your product catalog.">
+                <Breadcrumb><span>/ Inventory / <strong>Products</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowProductModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Product
+                    </button>
+                </Actions>
+            </PageHeader>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input @bind="search" @bind:event="oninput" @onkeyup="OnSearch" placeholder="Search products..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-64" />
+                <button @onclick="LoadProducts" class="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                    <span class="material-icons-outlined text-sm">refresh</span>
+                </button>
+            </div>
+            @if (products?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Code</th>
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Category</th>
+                                <th class="px-4 py-3">Cost</th>
+                                <th class="px-4 py-3">Sale Price</th>
+                                <th class="px-4 py-3">Stock</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in products.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@p.Code</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@p.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@p.CategoryName</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@p.CostPrice.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@p.SalePrice.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <span class="@(p.TotalStock <= p.ReorderPoint && p.ReorderPoint > 0 ? "text-red-600 font-semibold" : "text-gray-700")">
+                                            @p.TotalStock.ToString("N0") @p.UnitOfMeasure
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @ProductStatusColor(p.Status.ToString())">@p.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowProductModal(p)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="productPage" PageSize="productPageSize" TotalCount="products.TotalCount"
+                            PageChanged="async p => { productPage = p; await LoadProducts(); }"
+                            PageSizeChanged="async s => { productPageSize = s; productPage = 1; await LoadProducts(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Categories":
+            <PageHeader Title="Product Categories" Subtitle="Organize products into categories.">
+                <Breadcrumb><span>/ Inventory / <strong>Categories</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowCategoryModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Category
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (categories?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[500px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Parent Category</th>
+                                <th class="px-4 py-3">Description</th>
+                                <th class="px-4 py-3">Products</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in categories.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-medium">@c.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@(c.ParentName ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-400 max-w-xs truncate">@c.Description</td>
+                                    <td class="px-4 py-3 text-sm font-semibold">@c.ProductCount</td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowCategoryModal(c)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="catPage" PageSize="catPageSize" TotalCount="categories.TotalCount"
+                            PageChanged="async p => { catPage = p; await LoadCategories(); }"
+                            PageSizeChanged="async s => { catPageSize = s; catPage = 1; await LoadCategories(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Warehouses":
+            <PageHeader Title="Warehouses" Subtitle="Manage storage locations.">
+                <Breadcrumb><span>/ Inventory / <strong>Warehouses</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowWarehouseModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Warehouse
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (warehouses is not null)
+            {
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @foreach (var w in warehouses)
+                    {
+                        <div class="border border-gray-200 rounded-xl p-5 hover:border-indigo-200 transition">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
+                                    <span class="material-icons-outlined text-teal-600">warehouse</span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-xs @(w.IsActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")">@(w.IsActive ? "Active" : "Inactive")</span>
+                            </div>
+                            <h3 class="font-semibold text-gray-800">@w.Name</h3>
+                            <p class="text-sm text-gray-500 mt-0.5">@w.City, @w.Country</p>
+                            @if (!string.IsNullOrEmpty(w.ManagerName))
+                            {
+                                <p class="text-xs text-gray-400 mt-1">Manager: @w.ManagerName</p>
+                            }
+                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                                <span class="text-xs text-gray-500">@w.ProductCount products</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-semibold text-gray-700">@w.TotalValue.ToString("C0")</span>
+                                    <button @onclick="() => ShowWarehouseModal(w)" class="text-gray-400 hover:text-indigo-600">
+                                        <span class="material-icons-outlined text-sm">edit</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Stock Levels":
+            <PageHeader Title="Stock Levels" Subtitle="Current inventory levels across warehouses.">
+                <Breadcrumb><span>/ Inventory / <strong>Stock Levels</strong></span></Breadcrumb>
+            </PageHeader>
+            @if (stockLevels?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Product</th>
+                                <th class="px-4 py-3">Warehouse</th>
+                                <th class="px-4 py-3">On Hand</th>
+                                <th class="px-4 py-3">Reserved</th>
+                                <th class="px-4 py-3">Available</th>
+                                <th class="px-4 py-3">Reorder Point</th>
+                                <th class="px-4 py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in stockLevels.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3">
+                                        <div class="text-sm font-medium">@s.ProductName</div>
+                                        <div class="text-xs text-gray-400 font-mono">@s.ProductCode</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm">@s.WarehouseName</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@s.QuantityOnHand.ToString("N0")</td>
+                                    <td class="px-4 py-3 text-sm font-mono text-orange-600">@s.QuantityReserved.ToString("N0")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-green-600">@s.QuantityAvailable.ToString("N0")</td>
+                                    <td class="px-4 py-3 text-sm font-mono text-gray-500">@s.ReorderPoint.ToString("N0")</td>
+                                    <td class="px-4 py-3">
+                                        @if (s.IsLowStock)
+                                        {
+                                            <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">Low Stock</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">OK</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="stockPage" PageSize="stockPageSize" TotalCount="stockLevels.TotalCount"
+                            PageChanged="async p => { stockPage = p; await LoadStockLevels(); }"
+                            PageSizeChanged="async s => { stockPageSize = s; stockPage = 1; await LoadStockLevels(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Movements":
+            <PageHeader Title="Stock Movements" Subtitle="History of all inventory transactions.">
+                <Breadcrumb><span>/ Inventory / <strong>Movements</strong></span></Breadcrumb>
+            </PageHeader>
+            @if (movements?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Product</th>
+                                <th class="px-4 py-3">Warehouse</th>
+                                <th class="px-4 py-3">Type</th>
+                                <th class="px-4 py-3">Qty</th>
+                                <th class="px-4 py-3">Unit Cost</th>
+                                <th class="px-4 py-3">Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in movements.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm">@m.MovementDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@m.ProductName</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">@m.WarehouseName</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @MovementTypeColor(m.MovementType)">@m.MovementType</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono @(m.MovementType == "Issue" ? "text-red-600" : "text-green-600")">
+                                        @(m.MovementType == "Issue" ? "-" : "+")@m.Quantity.ToString("N0")
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono">@m.UnitCost.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-xs font-mono text-gray-500">@m.Reference</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="movePage" PageSize="movePageSize" TotalCount="movements.TotalCount"
+                            PageChanged="async p => { movePage = p; await LoadMovements(); }"
+                            PageSizeChanged="async s => { movePageSize = s; movePage = 1; await LoadMovements(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+</div>
+
+@* Product Modal *@
+<Modal IsVisible="showProductModal" Title='@(editProduct?.Id > 0 ? "Edit Product" : "New Product")' OnClose="() => showProductModal = false">
+    <ChildContent>
+    @if (editProduct is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input @bind="editProduct.Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="PRD-001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Barcode</label>
+                    <input @bind="editProduct.Barcode" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="Optional" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                <input @bind="editProduct.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editProduct.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
+                    <input type="number" @bind="editProduct.CostPrice" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sale Price</label>
+                    <input type="number" @bind="editProduct.SalePrice" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reorder Point</label>
+                    <input type="number" @bind="editProduct.ReorderPoint" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select @bind="editProduct.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Active</option><option>Inactive</option><option>Discontinued</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveProduct" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showProductModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Category Modal *@
+<Modal IsVisible="showCategoryModal" Title='@(editCategory?.Id > 0 ? "Edit Category" : "New Category")' OnClose="() => showCategoryModal = false">
+    <ChildContent>
+    @if (editCategory is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
+                <input @bind="editCategory.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editCategory.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveCategory" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showCategoryModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Warehouse Modal *@
+<Modal IsVisible="showWarehouseModal" Title='@(editWarehouse?.Id > 0 ? "Edit Warehouse" : "New Warehouse")' OnClose="() => showWarehouseModal = false">
+    <ChildContent>
+    @if (editWarehouse is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Warehouse Name</label>
+                <input @bind="editWarehouse.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input @bind="editWarehouse.Address" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input @bind="editWarehouse.City" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <input @bind="editWarehouse.Country" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveWarehouse" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showWarehouseModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@code {
+    private string activeTab = "Products";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Products"]     = "inventory_2",
+        ["Categories"]   = "category",
+        ["Warehouses"]   = "warehouse",
+        ["Stock Levels"] = "stacked_bar_chart",
+        ["Movements"]    = "swap_horiz"
+    };
+
+    private PagedResult<ProductDto>? products;
+    private string search = "";
+    private int productPage = 1, productPageSize = 10;
+    private bool showProductModal;
+    private ProductEditModel? editProduct;
+
+    private PagedResult<ProductCategoryDto>? categories;
+    private int catPage = 1, catPageSize = 10;
+    private bool showCategoryModal;
+    private CategoryEditModel? editCategory;
+
+    private List<WarehouseDto>? warehouses;
+    private bool showWarehouseModal;
+    private WarehouseEditModel? editWarehouse;
+
+    private PagedResult<StockLevelDto>? stockLevels;
+    private int stockPage = 1, stockPageSize = 10;
+
+    private PagedResult<StockMovementDto>? movements;
+    private int movePage = 1, movePageSize = 10;
+
+    protected override async Task OnInitializedAsync() => await LoadTab();
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Products":     await LoadProducts(); break;
+            case "Categories":   await LoadCategories(); break;
+            case "Warehouses":   await LoadWarehouses(); break;
+            case "Stock Levels": await LoadStockLevels(); break;
+            case "Movements":    await LoadMovements(); break;
+        }
+    }
+
+    private async Task LoadProducts()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ProductDto>>>($"/api/products?page={productPage}&pageSize={productPageSize}&search={search}");
+        products = r?.Data;
+    }
+
+    private async Task LoadCategories()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ProductCategoryDto>>>($"/api/product-categories?page={catPage}&pageSize={catPageSize}");
+        categories = r?.Data;
+    }
+
+    private async Task LoadWarehouses()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<WarehouseDto>>>("/api/warehouses");
+        warehouses = r?.Data;
+    }
+
+    private async Task LoadStockLevels()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<StockLevelDto>>>($"/api/stock-levels?page={stockPage}&pageSize={stockPageSize}");
+        stockLevels = r?.Data;
+    }
+
+    private async Task LoadMovements()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<StockMovementDto>>>($"/api/stock-movements?page={movePage}&pageSize={movePageSize}");
+        movements = r?.Data;
+    }
+
+    private void OnSearch(KeyboardEventArgs e) { if (e.Key == "Enter") _ = LoadProducts(); }
+
+    private void ShowProductModal(ProductDto? p = null)
+    {
+        editProduct = p is null ? new ProductEditModel() : new ProductEditModel
+        {
+            Id = p.Id, Code = p.Code, Name = p.Name, Description = p.Description,
+            CostPrice = p.CostPrice, SalePrice = p.SalePrice, ReorderPoint = p.ReorderPoint,
+            StatusStr = p.Status.ToString(), Barcode = p.Barcode
+        };
+        showProductModal = true;
+    }
+
+    private async Task SaveProduct()
+    {
+        if (editProduct is null) return;
+        var dto = new ProductDto { Id = editProduct.Id, Code = editProduct.Code, Name = editProduct.Name, Description = editProduct.Description, CostPrice = editProduct.CostPrice, SalePrice = editProduct.SalePrice, ReorderPoint = editProduct.ReorderPoint, Barcode = editProduct.Barcode };
+        if (editProduct.Id == 0) await Api.PostAsync<ProductDto, ApiResponse<ProductDto>>("/api/products", dto);
+        else await Api.PutAsync<ProductDto, ApiResponse<ProductDto>>($"/api/products/{editProduct.Id}", dto);
+        showProductModal = false;
+        await LoadProducts();
+    }
+
+    private void ShowCategoryModal(ProductCategoryDto? c = null)
+    {
+        editCategory = c is null ? new CategoryEditModel() : new CategoryEditModel { Id = c.Id, Name = c.Name, Description = c.Description };
+        showCategoryModal = true;
+    }
+
+    private async Task SaveCategory()
+    {
+        if (editCategory is null) return;
+        var dto = new ProductCategoryDto { Id = editCategory.Id, Name = editCategory.Name, Description = editCategory.Description };
+        if (editCategory.Id == 0) await Api.PostAsync<ProductCategoryDto, ApiResponse<ProductCategoryDto>>("/api/product-categories", dto);
+        else await Api.PutAsync<ProductCategoryDto, ApiResponse<ProductCategoryDto>>($"/api/product-categories/{editCategory.Id}", dto);
+        showCategoryModal = false;
+        await LoadCategories();
+    }
+
+    private void ShowWarehouseModal(WarehouseDto? w = null)
+    {
+        editWarehouse = w is null ? new WarehouseEditModel() : new WarehouseEditModel { Id = w.Id, Name = w.Name, Address = w.Address, City = w.City, Country = w.Country };
+        showWarehouseModal = true;
+    }
+
+    private async Task SaveWarehouse()
+    {
+        if (editWarehouse is null) return;
+        var dto = new WarehouseDto { Id = editWarehouse.Id, Name = editWarehouse.Name, Address = editWarehouse.Address, City = editWarehouse.City, Country = editWarehouse.Country, IsActive = true };
+        if (editWarehouse.Id == 0) await Api.PostAsync<WarehouseDto, ApiResponse<WarehouseDto>>("/api/warehouses", dto);
+        else await Api.PutAsync<WarehouseDto, ApiResponse<WarehouseDto>>($"/api/warehouses/{editWarehouse.Id}", dto);
+        showWarehouseModal = false;
+        await LoadWarehouses();
+    }
+
+    private static string ProductStatusColor(string s) => s switch
+    {
+        "Active"       => "bg-green-100 text-green-700",
+        "Inactive"     => "bg-gray-100 text-gray-500",
+        "Discontinued" => "bg-red-100 text-red-600",
+        _              => "bg-gray-100 text-gray-600"
+    };
+
+    private static string MovementTypeColor(string t) => t switch
+    {
+        "Receipt"    => "bg-green-100 text-green-700",
+        "Issue"      => "bg-red-100 text-red-700",
+        "Adjustment" => "bg-yellow-100 text-yellow-700",
+        "Transfer"   => "bg-blue-100 text-blue-700",
+        "Return"     => "bg-purple-100 text-purple-700",
+        _            => "bg-gray-100 text-gray-600"
+    };
+
+    private class ProductEditModel
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public decimal CostPrice { get; set; }
+        public decimal SalePrice { get; set; }
+        public decimal ReorderPoint { get; set; }
+        public string StatusStr { get; set; } = "Active";
+        public string? Barcode { get; set; }
+    }
+
+    private class CategoryEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+    }
+
+    private class WarehouseEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? Country { get; set; }
+    }
+}

@@ -1,0 +1,289 @@
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ThemeService Theme
+@inject BrandingService Branding
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="flex h-screen bg-gray-50 dark:bg-slate-900">
+
+    @* ── Mobile overlay backdrop ── *@
+    @if (mobileOpen)
+    {
+        <div class="fixed inset-0 z-30 bg-black/50 lg:hidden" @onclick="() => mobileOpen = false"></div>
+    }
+
+    @* ── Sidebar ── *@
+    <aside class="@SidebarClass() transition-[width] duration-300 ease-in-out bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col z-40">
+
+        @* Brand — logo is always the sidebar toggle on desktop *@
+        <div class="flex items-center gap-3 px-4 h-16 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+            @* Logo button: collapses/expands on desktop *@
+            <button @onclick="ToggleSidebar"
+                    class="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg hover:opacity-80 transition-opacity flex-shrink-0"
+                    title="@(collapsed ? "Expand sidebar" : "Collapse sidebar")">
+                @if (!string.IsNullOrWhiteSpace(Branding.LogoUrl))
+                {
+                    <img src="@Branding.LogoUrl" class="w-8 h-8 rounded-lg object-contain" alt="logo"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 items-center justify-center" style="display:none">
+                        <span class="text-white text-xs font-extrabold tracking-tight">@Branding.LogoText</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                        <span class="text-white text-xs font-extrabold tracking-tight">@Branding.LogoText</span>
+                    </div>
+                }
+            </button>
+            @* Company name + tagline (hidden when collapsed) *@
+            <a href="/" class="sidebar-text flex flex-col min-w-0 flex-1 hover:opacity-80 transition-opacity">
+                <span class="font-extrabold text-base text-gray-900 dark:text-white leading-tight tracking-wide @(Branding.TruncateSidebarText ? "truncate" : "")">@Branding.CompanyName</span>
+                <span class="text-xs text-gray-400 dark:text-slate-400 leading-tight @(Branding.TruncateSidebarText ? "truncate" : "")">@Branding.CompanyTagline</span>
+            </a>
+        </div>
+
+        @* Nav *@
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <NavItem Icon="dashboard"         Label="Dashboard"    Href=""               Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="account_balance"   Label="Finance"      Href="finance"        Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="inventory_2"       Label="Inventory"    Href="inventory"      Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="shopping_cart"     Label="Procurement"  Href="procurement"    Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="point_of_sale"     Label="Sales"        Href="sales"          Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="assignment"        Label="Projects"     Href="projects"       Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="contacts"          Label="CRM"          Href="crm"            Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="bar_chart"         Label="Reports"      Href="reports"        Collapsed="collapsed" OnClick="CloseMobile" />
+            <div class="mt-2 mb-1 px-6">
+                <div class="border-t border-gray-100 dark:border-slate-700"></div>
+            </div>
+            <NavItem Icon="receipt_long"      Label="System Logs"     Href="system-logs"     Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="tune"              Label="App Settings"    Href="app-settings"    Collapsed="collapsed" OnClick="CloseMobile" />
+            <NavItem Icon="code"              Label="System Settings" Href="system-settings" Collapsed="collapsed" OnClick="CloseMobile" />
+        </nav>
+
+        @* User info *@
+        <div class="border-t border-gray-100 dark:border-slate-700 p-3 flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 @RoleColorClass(userInfo?.Role)">
+                    @UserInitials(userInfo)
+                </div>
+                <div class="sidebar-text min-w-0">
+                    <div class="text-sm font-medium text-gray-700 dark:text-slate-200 truncate">@(userInfo?.FullName ?? "User")</div>
+                    <div class="text-xs text-gray-400 dark:text-slate-400 truncate">@(userInfo?.Role ?? "")</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    @* ── Main content ── *@
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        @* Top bar *@
+        <header class="h-16 @Theme.TopBarClass() flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                @* Mobile-only hamburger — desktop uses the one in the sidebar brand area *@
+                <button @onclick="ToggleSidebar"
+                        class="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-white/20 transition overflow-hidden flex-shrink-0">
+                    @if (!string.IsNullOrWhiteSpace(Branding.LogoUrl))
+                    {
+                        <img src="@Branding.LogoUrl" class="w-8 h-8 rounded-lg object-contain" alt="logo"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                        <div class="w-8 h-8 rounded-lg bg-white/20 items-center justify-center" style="display:none">
+                            <span class="text-white text-xs font-extrabold tracking-tight">@Branding.LogoText</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                            <span class="text-white text-xs font-extrabold tracking-tight">@Branding.LogoText</span>
+                        </div>
+                    }
+                </button>
+                <span class="text-white font-semibold text-base tracking-wide">@Branding.AppTitle</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* User menu (single button — theme controls + profile + sign out) *@
+                <div class="relative">
+                    <button @onclick="() => showMenu = !showMenu"
+                            class="flex items-center gap-2 text-white hover:text-gray-200 transition-colors">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 @RoleColorClass(userInfo?.Role)">
+                            @UserInitials(userInfo)
+                        </div>
+                        <div class="text-left hidden sm:block">
+                            <div class="text-sm font-semibold leading-tight">@(userInfo?.FullName ?? "User")</div>
+                            <div class="text-xs text-white/60 leading-tight">@(userInfo?.Role ?? "")</div>
+                        </div>
+                        <span class="material-icons-outlined text-sm">expand_more</span>
+                    </button>
+                    @if (showMenu)
+                    {
+                        <div class="fixed inset-0 z-30" @onclick="() => showMenu = false"></div>
+                        <div class="absolute right-0 top-12 bg-white dark:bg-slate-800 rounded-xl shadow-xl py-2 w-56 z-50 border border-gray-100 dark:border-slate-700">
+                            <a href="profile" @onclick="() => showMenu = false" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700">
+                                <span class="material-icons-outlined text-base">person</span> Profile
+                            </a>
+                            <div class="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                            @* Theme *@
+                            <div class="px-4 py-2">
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Appearance</p>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                                        <span class="material-icons-outlined text-base">@(Theme.IsDark ? "dark_mode" : "light_mode")</span>
+                                        @(Theme.IsDark ? "Dark" : "Light")
+                                    </span>
+                                    <button @onclick="ToggleTheme"
+                                            class="@(Theme.IsDark ? "bg-indigo-600" : "bg-gray-200") relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0">
+                                        <span class="@(Theme.IsDark ? "translate-x-6" : "translate-x-1") inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"></span>
+                                    </button>
+                                </div>
+                                <div class="flex gap-1.5 flex-wrap">
+                                    @foreach (var a in AccentColors)
+                                    {
+                                        <button @onclick="() => SetAccent(a.Key)"
+                                                title="@a.Key"
+                                                class="w-6 h-6 rounded-full transition-all @(Theme.Accent == a.Key ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : "hover:scale-105")"
+                                                style="background-color: @a.Value">
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                            <button @onclick="Logout" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-slate-700">
+                                <span class="material-icons-outlined text-base">logout</span> Sign Out
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </header>
+
+        @* Page content *@
+        <main id="main-scroll" class="flex-1 overflow-y-auto p-4 lg:p-6 bg-gray-50 dark:bg-slate-900">
+            @Body
+            @if (showScrollTop)
+            {
+                <button class="scroll-top-btn" @onclick="ScrollToTop" title="Back to top">
+                    <span class="material-icons-outlined text-sm">arrow_upward</span>
+                </button>
+            }
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool collapsed;
+    private bool mobileOpen;
+    private bool showMenu;
+    private bool showScrollTop;
+    private UserInfo? userInfo;
+
+    private static readonly Dictionary<string, string> AccentColors = new()
+    {
+        { "indigo",  "#6366f1" },
+        { "violet",  "#7c3aed" },
+        { "blue",    "#2563eb" },
+        { "emerald", "#059669" },
+        { "rose",    "#e11d48" },
+        { "amber",   "#d97706" },
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.InitializeAsync();
+        userInfo = await Auth.GetUserInfoAsync();
+        await Theme.InitAsync();
+        await Branding.InitAsync();
+        Theme.OnChange    += StateHasChanged;
+        Branding.OnChange += OnBrandingChanged;
+        Auth.OnUserChanged += OnUserChanged;
+        await ApplyFaviconAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("scrollManager.init", "main-scroll", DotNetObjectReference.Create(this), 100);
+    }
+
+    [JSInvokable]
+    public void OnScrolled(bool show)
+    {
+        if (showScrollTop != show) { showScrollTop = show; StateHasChanged(); }
+    }
+
+    private async void OnUserChanged()
+    {
+        userInfo = await Auth.GetUserInfoAsync();
+        StateHasChanged();
+    }
+
+    private async void OnBrandingChanged()
+    {
+        StateHasChanged();
+        await ApplyFaviconAsync();
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange     -= StateHasChanged;
+        Branding.OnChange  -= OnBrandingChanged;
+        Auth.OnUserChanged -= OnUserChanged;
+    }
+
+    private void CloseMobile() => mobileOpen = false;
+
+    private async Task ToggleSidebar()
+    {
+        var isMobile = await JS.InvokeAsync<bool>("eval", "window.innerWidth < 1024");
+        if (isMobile) mobileOpen = !mobileOpen;
+        else collapsed = !collapsed;
+    }
+
+    private async Task ScrollToTop()
+        => await JS.InvokeVoidAsync("eval", "document.getElementById('main-scroll').scrollTop=0");
+
+    private async Task ApplyFaviconAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Branding.FaviconUrl))
+            await JS.InvokeVoidAsync("brandingManager.setFavicon", Branding.FaviconUrl);
+    }
+
+    private string SidebarClass()
+    {
+        if (mobileOpen) return "fixed inset-y-0 left-0 sidebar-expanded flex flex-col";
+        return collapsed
+            ? "hidden lg:flex lg:flex-col sidebar-collapsed relative"
+            : "hidden lg:flex lg:flex-col sidebar-expanded relative";
+    }
+
+    private async Task ToggleTheme()  => await Theme.ToggleThemeAsync();
+    private async Task SetAccent(string accent) => await Theme.SetAccentAsync(accent);
+
+    private async Task Logout()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/account/login", true);
+    }
+
+    private static string UserInitials(UserInfo? user)
+    {
+        if (user is null) return "?";
+        var f = user.FirstName?.FirstOrDefault();
+        var l = user.LastName?.FirstOrDefault();
+        return f.HasValue && l.HasValue ? $"{f}{l}" : user.Email?.Substring(0, 2).ToUpper() ?? "?";
+    }
+
+    private static string RoleColorClass(string? role) => role switch
+    {
+        "Super Admin"        => "bg-indigo-500",
+        "Admin"              => "bg-violet-500",
+        "Finance Manager"    => "bg-blue-500",
+        "Sales Manager"      => "bg-green-500",
+        "Inventory Manager"  => "bg-teal-500",
+        "Employee"           => "bg-amber-500",
+        _                    => "bg-slate-500"
+    };
+}

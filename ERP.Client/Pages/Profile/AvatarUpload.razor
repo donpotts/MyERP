@@ -1,0 +1,77 @@
+@inject ApiService Api
+@inject AuthService Auth
+
+<PageHeader Title="Profile Avatar" Subtitle="Upload or change your profile picture." />
+
+<div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+    <div class="w-28 h-28 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-4 border-indigo-100 flex-shrink-0">
+        @if (!string.IsNullOrEmpty(avatarUrl))
+        {
+            <img src="@avatarUrl" class="w-full h-full object-cover" alt="Avatar" />
+        }
+        else
+        {
+            <span class="material-icons-outlined text-5xl text-gray-300">person</span>
+        }
+    </div>
+    <div class="min-w-0">
+        <InputFile OnChange="OnFileSelected"
+                   class="block text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer"
+                   accept=".jpg,.jpeg,.png,.gif" />
+        <p class="text-xs text-gray-400 mt-2">JPG, PNG, or GIF. Max 5MB.</p>
+        @if (uploading)
+        {
+            <p class="text-sm text-indigo-500 mt-2 flex items-center gap-1">
+                <span class="material-icons-outlined text-base animate-spin">autorenew</span> Uploading...
+            </p>
+        }
+        else if (!string.IsNullOrEmpty(message))
+        {
+            <p class="text-sm mt-2 @(isError ? "text-red-600" : "text-green-600") flex items-center gap-1">
+                <span class="material-icons-outlined text-base">@(isError ? "error_outline" : "check_circle")</span>
+                @message
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    private string? avatarUrl;
+    private string? message;
+    private bool isError;
+    private bool uploading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await Auth.GetUserInfoAsync();
+        avatarUrl = user?.AvatarUrl;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > 5 * 1024 * 1024) { message = "File too large (max 5MB)"; isError = true; return; }
+
+        uploading = true; message = null;
+
+        using var content = new MultipartFormDataContent();
+        using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        content.Add(new StreamContent(stream), "file", file.Name);
+
+        var result = await Api.PostFileAsync("/api/profile/avatar", content);
+        uploading = false;
+
+        if (result?.IsSuccess == true && result.Data is not null)
+        {
+            avatarUrl = result.Data;
+            await Auth.UpdateAvatarAsync(result.Data);
+            message = "Avatar updated successfully!";
+            isError = false;
+        }
+        else
+        {
+            message = result?.Message ?? "Upload failed";
+            isError = true;
+        }
+    }
+}

@@ -1,0 +1,976 @@
+@page "/finance"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApiService Api
+
+<PageTitle>Finance</PageTitle>
+
+<TabContainer Tabs="tabs" ActiveTab="@activeTab" OnTabChanged="async t => { activeTab = t; await LoadTab(); }" />
+
+<div class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-4">
+    @switch (activeTab)
+    {
+        case "Accounts":
+            <PageHeader Title="Chart of Accounts" Subtitle="Manage your general ledger accounts.">
+                <Breadcrumb><span>/ Finance / <strong>Accounts</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowAccountModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Account
+                    </button>
+                </Actions>
+            </PageHeader>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input @bind="search" @bind:event="oninput" @onkeyup="OnSearch" placeholder="Search accounts..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-64" />
+                <button @onclick="LoadAccounts" class="px-3 py-2 border border-gray-300 rounded-lg text-sm flex items-center gap-1 hover:bg-gray-50">
+                    <span class="material-icons-outlined text-sm">refresh</span>
+                </button>
+            </div>
+            @if (accounts?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Code</th>
+                                <th class="px-4 py-3">Name</th>
+                                <th class="px-4 py-3">Type</th>
+                                <th class="px-4 py-3">Balance</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in accounts.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@a.Code</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@a.Name</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @AccountTypeColor(a.Type.ToString())">@a.Type</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-mono">@a.Balance.ToString("C2")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs @(a.Status.ToString() == "Active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")">@a.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowAccountModal(a)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="accountPage" PageSize="accountPageSize" TotalCount="accounts.TotalCount"
+                            PageChanged="async p => { accountPage = p; await LoadAccounts(); }"
+                            PageSizeChanged="async s => { accountPageSize = s; accountPage = 1; await LoadAccounts(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Journal":
+            <PageHeader Title="Journal Entries" Subtitle="View and post journal entries.">
+                <Breadcrumb><span>/ Finance / <strong>Journal Entries</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowJournalModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Entry
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (journals?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Reference</th>
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Description</th>
+                                <th class="px-4 py-3">Debit</th>
+                                <th class="px-4 py-3">Credit</th>
+                                <th class="px-4 py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in journals.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@j.Reference</td>
+                                    <td class="px-4 py-3 text-sm">@j.EntryDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">@j.Description</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@j.TotalDebit.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@j.TotalCredit.ToString("C2")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @JournalStatusColor(j.Status.ToString())">@j.Status</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="journalPage" PageSize="journalPageSize" TotalCount="journals.TotalCount"
+                            PageChanged="async p => { journalPage = p; await LoadJournals(); }"
+                            PageSizeChanged="async s => { journalPageSize = s; journalPage = 1; await LoadJournals(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Payables":
+            <PageHeader Title="Accounts Payable" Subtitle="Vendor invoices and payments due.">
+                <Breadcrumb><span>/ Finance / <strong>Accounts Payable</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowAPModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New AP Invoice
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (apInvoices?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Invoice #</th>
+                                <th class="px-4 py-3">Vendor</th>
+                                <th class="px-4 py-3">Invoice Date</th>
+                                <th class="px-4 py-3">Due Date</th>
+                                <th class="px-4 py-3">Total</th>
+                                <th class="px-4 py-3">Balance Due</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var inv in apInvoices.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@inv.InvoiceNumber</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@inv.VendorName</td>
+                                    <td class="px-4 py-3 text-sm">@inv.InvoiceDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm @(inv.DueDate < DateTime.Now && inv.Status.ToString() != "Paid" ? "text-red-600 font-medium" : "")">@inv.DueDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@inv.TotalAmount.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold">@inv.BalanceDue.ToString("C2")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @InvoiceStatusColor(inv.Status.ToString())">@inv.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowAPModal(inv)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="apPage" PageSize="apPageSize" TotalCount="apInvoices.TotalCount"
+                            PageChanged="async p => { apPage = p; await LoadAPInvoices(); }"
+                            PageSizeChanged="async s => { apPageSize = s; apPage = 1; await LoadAPInvoices(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Receivables":
+            <PageHeader Title="Accounts Receivable" Subtitle="Customer invoices and payments due.">
+                <Breadcrumb><span>/ Finance / <strong>Accounts Receivable</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowARModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New AR Invoice
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (arInvoices?.Items is not null)
+            {
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[700px]">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                <th class="px-4 py-3">Invoice #</th>
+                                <th class="px-4 py-3">Customer</th>
+                                <th class="px-4 py-3">Invoice Date</th>
+                                <th class="px-4 py-3">Due Date</th>
+                                <th class="px-4 py-3">Total</th>
+                                <th class="px-4 py-3">Balance Due</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var inv in arInvoices.Items)
+                            {
+                                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-mono font-bold text-indigo-600">@inv.InvoiceNumber</td>
+                                    <td class="px-4 py-3 text-sm font-medium">@inv.CustomerName</td>
+                                    <td class="px-4 py-3 text-sm">@inv.InvoiceDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm @(inv.DueDate < DateTime.Now && inv.Status.ToString() != "Paid" ? "text-red-600 font-medium" : "")">@inv.DueDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-4 py-3 text-sm font-mono">@inv.TotalAmount.ToString("C2")</td>
+                                    <td class="px-4 py-3 text-sm font-mono font-semibold @(inv.BalanceDue > 0 ? "text-red-600" : "text-green-600")">@inv.BalanceDue.ToString("C2")</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium @InvoiceStatusColor(inv.Status.ToString())">@inv.Status</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button @onclick="() => ShowARModal(inv)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <Pagination Page="arPage" PageSize="arPageSize" TotalCount="arInvoices.TotalCount"
+                            PageChanged="async p => { arPage = p; await LoadARInvoices(); }"
+                            PageSizeChanged="async s => { arPageSize = s; arPage = 1; await LoadARInvoices(); }" />
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+
+        case "Bank":
+            <PageHeader Title="Bank Accounts" Subtitle="Manage bank accounts and transactions.">
+                <Breadcrumb><span>/ Finance / <strong>Bank</strong></span></Breadcrumb>
+                <Actions>
+                    <button @onclick="() => ShowBankModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2">
+                        <span class="material-icons-outlined text-sm">add</span> New Bank Account
+                    </button>
+                </Actions>
+            </PageHeader>
+            @if (bankAccounts is not null)
+            {
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    @foreach (var bank in bankAccounts)
+                    {
+                        <div class="border border-gray-200 rounded-xl p-4 hover:border-indigo-200 transition cursor-pointer @(selectedBank?.Id == bank.Id ? "ring-2 ring-indigo-500" : "")"
+                             @onclick="() => SelectBank(bank)">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mb-3">
+                                        <span class="material-icons-outlined text-indigo-600">account_balance</span>
+                                    </div>
+                                    <p class="font-semibold text-gray-800">@bank.Name</p>
+                                    <p class="text-xs text-gray-500">@bank.BankName</p>
+                                    <p class="text-xs text-gray-400 font-mono mt-1">•••• @bank.AccountNumber[^Math.Min(4, bank.AccountNumber.Length)..]</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-lg font-bold text-gray-800">@bank.Balance.ToString("C0")</p>
+                                    <p class="text-xs text-gray-400">@bank.Currency</p>
+                                    <span class="text-xs @(bank.IsActive ? "text-green-500" : "text-gray-400")">@(bank.IsActive ? "Active" : "Inactive")</span>
+                                    <div class="mt-1">
+                                        <button @onclick:stopPropagation="true" @onclick="() => ShowBankModal(bank)" class="text-gray-400 hover:text-indigo-600">
+                                            <span class="material-icons-outlined text-sm">edit</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (selectedBank is not null && bankTransactions?.Items is not null)
+                {
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-gray-800">Transactions — @selectedBank.Name</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[600px]">
+                            <thead>
+                                <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200">
+                                    <th class="px-4 py-3">Date</th>
+                                    <th class="px-4 py-3">Reference</th>
+                                    <th class="px-4 py-3">Description</th>
+                                    <th class="px-4 py-3">Type</th>
+                                    <th class="px-4 py-3">Amount</th>
+                                    <th class="px-4 py-3">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tx in bankTransactions.Items)
+                                {
+                                    <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                        <td class="px-4 py-3 text-sm">@tx.TransactionDate.ToString("MMM dd, yyyy")</td>
+                                        <td class="px-4 py-3 text-xs font-mono">@tx.Reference</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">@tx.Description</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 rounded text-xs @(tx.Type == "Deposit" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")">@tx.Type</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm font-mono @(tx.Type == "Deposit" ? "text-green-600" : "text-red-600")">
+                                            @(tx.Type == "Deposit" ? "+" : "-")@tx.Amount.ToString("C2")
+                                        </td>
+                                        <td class="px-4 py-3 text-sm font-mono font-semibold">@tx.RunningBalance.ToString("C2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <Pagination Page="bankTxPage" PageSize="bankTxPageSize" TotalCount="bankTransactions.TotalCount"
+                                PageChanged="async p => { bankTxPage = p; await LoadBankTransactions(); }"
+                                PageSizeChanged="async s => { bankTxPageSize = s; bankTxPage = 1; await LoadBankTransactions(); }" />
+                }
+            }
+            else
+            {
+                <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            }
+            break;
+    }
+</div>
+
+@* Account Modal *@
+<Modal IsVisible="showAccountModal" Title='@(editAccount?.Id > 0 ? "Edit Account" : "New Account")' OnClose="() => showAccountModal = false">
+    <ChildContent>
+    @if (editAccount is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                    <input @bind="editAccount.Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="1000" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select @bind="editAccount.TypeStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Asset</option><option>Liability</option><option>Equity</option><option>Revenue</option><option>Expense</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+                <input @bind="editAccount.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Cash and Cash Equivalents" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editAccount.Description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Optional description"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveAccount" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showAccountModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Journal Entry Modal *@
+<Modal IsVisible="showJournalModal" Title="New Journal Entry" OnClose="() => showJournalModal = false">
+    <ChildContent>
+    @if (editJournal is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                    <input @bind="editJournal.Reference" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="JE-0001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
+                    <input type="date" @bind="editJournal.EntryDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea @bind="editJournal.Description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Journal entry description"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select @bind="editJournal.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option>Draft</option>
+                    <option>Posted</option>
+                    <option>Voided</option>
+                </select>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveJournal" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showJournalModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* AP Invoice Modal *@
+<Modal IsVisible="showAPModal_flag" Title='@(editAPInvoice?.Id > 0 ? "Edit AP Invoice" : "New AP Invoice")' OnClose="() => showAPModal_flag = false">
+    <ChildContent>
+    @if (editAPInvoice is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                    <input @bind="editAPInvoice.InvoiceNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="INV-0001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+                    <select @bind="editAPInvoice.VendorId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="0">-- Select Vendor --</option>
+                        @if (allVendors is not null)
+                        {
+                            @foreach (var v in allVendors)
+                            {
+                                <option value="@v.Id">@v.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date</label>
+                    <input type="date" @bind="editAPInvoice.InvoiceDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="date" @bind="editAPInvoice.DueDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sub Total</label>
+                    <input type="number" step="0.01" @bind="editAPInvoice.SubTotal" @bind:after="RecalcAPTotal" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="0.00" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                    <input type="number" step="0.01" @bind="editAPInvoice.TaxAmount" @bind:after="RecalcAPTotal" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="0.00" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+                    <input type="number" readonly value="@editAPInvoice.TotalAmount" class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm font-mono text-gray-600" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select @bind="editAPInvoice.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option>Draft</option>
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Paid</option>
+                    <option>Overdue</option>
+                    <option>Cancelled</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea @bind="editAPInvoice.Notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Optional notes"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveAPInvoice" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showAPModal_flag = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* AR Invoice Modal *@
+<Modal IsVisible="showARModal_flag" Title='@(editARInvoice?.Id > 0 ? "Edit AR Invoice" : "New AR Invoice")' OnClose="() => showARModal_flag = false">
+    <ChildContent>
+    @if (editARInvoice is not null)
+    {
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                    <input @bind="editARInvoice.InvoiceNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="AR-0001" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+                    <select @bind="editARInvoice.CustomerId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="0">-- Select Customer --</option>
+                        @if (allCustomers is not null)
+                        {
+                            @foreach (var c in allCustomers)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Date</label>
+                    <input type="date" @bind="editARInvoice.InvoiceDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="date" @bind="editARInvoice.DueDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sub Total</label>
+                    <input type="number" step="0.01" @bind="editARInvoice.SubTotal" @bind:after="RecalcARTotal" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="0.00" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                    <input type="number" step="0.01" @bind="editARInvoice.TaxAmount" @bind:after="RecalcARTotal" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="0.00" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+                    <input type="number" readonly value="@editARInvoice.TotalAmount" class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm font-mono text-gray-600" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select @bind="editARInvoice.StatusStr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option>Draft</option>
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Paid</option>
+                    <option>PartiallyPaid</option>
+                    <option>Overdue</option>
+                    <option>Cancelled</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea @bind="editARInvoice.Notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Optional notes"></textarea>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveARInvoice" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showARModal_flag = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@* Bank Account Modal *@
+<Modal IsVisible="showBankModal" Title='@(editBankAccount?.Id > 0 ? "Edit Bank Account" : "New Bank Account")' OnClose="() => showBankModal = false">
+    <ChildContent>
+    @if (editBankAccount is not null)
+    {
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+                <input @bind="editBankAccount.Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Main Operating Account" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                    <input @bind="editBankAccount.BankName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="First National Bank" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                    <input @bind="editBankAccount.AccountNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="123456789" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <input @bind="editBankAccount.Currency" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="USD" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Opening Balance</label>
+                    <input type="number" step="0.01" @bind="editBankAccount.Balance" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" placeholder="0.00" />
+                </div>
+            </div>
+        </div>
+    }
+    </ChildContent>
+    <Footer>
+        <button @onclick="SaveBankAccount" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save</button>
+        <button @onclick="() => showBankModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+    </Footer>
+</Modal>
+
+@code {
+    private string activeTab = "Accounts";
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Accounts"]    = "account_tree",
+        ["Journal"]     = "receipt_long",
+        ["Payables"]    = "payment",
+        ["Receivables"] = "request_quote",
+        ["Bank"]        = "account_balance"
+    };
+
+    // Accounts
+    private PagedResult<AccountDto>? accounts;
+    private string search = "";
+    private int accountPage = 1, accountPageSize = 10;
+    private bool showAccountModal;
+    private AccountEditModel? editAccount;
+
+    // Journals
+    private PagedResult<JournalEntryDto>? journals;
+    private int journalPage = 1, journalPageSize = 10;
+    private bool showJournalModal;
+    private JournalEditModel? editJournal;
+
+    // AP
+    private PagedResult<APInvoiceDto>? apInvoices;
+    private int apPage = 1, apPageSize = 10;
+    private bool showAPModal_flag;
+    private APInvoiceEditModel? editAPInvoice;
+    private List<VendorDto>? allVendors;
+
+    // AR
+    private PagedResult<ARInvoiceDto>? arInvoices;
+    private int arPage = 1, arPageSize = 10;
+    private bool showARModal_flag;
+    private ARInvoiceEditModel? editARInvoice;
+    private List<CustomerDto>? allCustomers;
+
+    // Bank
+    private List<BankAccountDto>? bankAccounts;
+    private BankAccountDto? selectedBank;
+    private PagedResult<BankTransactionDto>? bankTransactions;
+    private int bankTxPage = 1, bankTxPageSize = 10;
+    private bool showBankModal;
+    private BankAccountEditModel? editBankAccount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadTab(), LoadAllVendors(), LoadAllCustomers());
+    }
+
+    private async Task LoadTab()
+    {
+        switch (activeTab)
+        {
+            case "Accounts":    await LoadAccounts(); break;
+            case "Journal":     await LoadJournals(); break;
+            case "Payables":    await LoadAPInvoices(); break;
+            case "Receivables": await LoadARInvoices(); break;
+            case "Bank":        await LoadBankAccounts(); break;
+        }
+    }
+
+    private async Task LoadAccounts()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<AccountDto>>>($"/api/accounts?page={accountPage}&pageSize={accountPageSize}&search={search}");
+        accounts = r?.Data;
+    }
+
+    private async Task LoadJournals()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<JournalEntryDto>>>($"/api/journal-entries?page={journalPage}&pageSize={journalPageSize}");
+        journals = r?.Data;
+    }
+
+    private async Task LoadAPInvoices()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<APInvoiceDto>>>($"/api/ap-invoices?page={apPage}&pageSize={apPageSize}");
+        apInvoices = r?.Data;
+    }
+
+    private async Task LoadARInvoices()
+    {
+        var r = await Api.GetAsync<ApiResponse<PagedResult<ARInvoiceDto>>>($"/api/ar-invoices?page={arPage}&pageSize={arPageSize}");
+        arInvoices = r?.Data;
+    }
+
+    private async Task LoadBankAccounts()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<BankAccountDto>>>("/api/bank-accounts");
+        bankAccounts = r?.Data;
+        if (bankAccounts?.Any() == true)
+        {
+            selectedBank = bankAccounts.First();
+            await LoadBankTransactions();
+        }
+    }
+
+    private async Task LoadAllVendors()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<VendorDto>>>("/api/vendors/all");
+        allVendors = r?.Data;
+    }
+
+    private async Task LoadAllCustomers()
+    {
+        var r = await Api.GetAsync<ApiResponse<List<CustomerDto>>>("/api/customers/all");
+        allCustomers = r?.Data;
+    }
+
+    private async Task SelectBank(BankAccountDto bank)
+    {
+        selectedBank = bank;
+        bankTxPage = 1;
+        await LoadBankTransactions();
+    }
+
+    private async Task LoadBankTransactions()
+    {
+        if (selectedBank is null) return;
+        var r = await Api.GetAsync<ApiResponse<PagedResult<BankTransactionDto>>>($"/api/bank-accounts/{selectedBank.Id}/transactions?page={bankTxPage}&pageSize={bankTxPageSize}");
+        bankTransactions = r?.Data;
+    }
+
+    private void OnSearch(KeyboardEventArgs e) { if (e.Key == "Enter") _ = LoadAccounts(); }
+
+    private void ShowAccountModal(AccountDto? existing = null)
+    {
+        editAccount = existing is null ? new AccountEditModel() : new AccountEditModel { Id = existing.Id, Code = existing.Code, Name = existing.Name, TypeStr = existing.Type.ToString(), Description = existing.Description };
+        showAccountModal = true;
+    }
+
+    private async Task SaveAccount()
+    {
+        if (editAccount is null) return;
+        if (editAccount.Id == 0)
+            await Api.PostAsync<AccountDto, ApiResponse<AccountDto>>("/api/accounts", MapToDto(editAccount));
+        else
+            await Api.PutAsync<AccountDto, ApiResponse<AccountDto>>($"/api/accounts/{editAccount.Id}", MapToDto(editAccount));
+        showAccountModal = false;
+        await LoadAccounts();
+    }
+
+    private static AccountDto MapToDto(AccountEditModel m) => new()
+    {
+        Id = m.Id, Code = m.Code, Name = m.Name,
+        Type = Enum.TryParse<AccountType>(m.TypeStr, out var t) ? t : AccountType.Asset,
+        Description = m.Description
+    };
+
+    private void ShowJournalModal()
+    {
+        editJournal = new JournalEditModel
+        {
+            EntryDate = DateTime.Today,
+            StatusStr = "Draft"
+        };
+        showJournalModal = true;
+    }
+
+    private async Task SaveJournal()
+    {
+        if (editJournal is null) return;
+        await Api.PostAsync<object, ApiResponse<JournalEntryDto>>("/api/journal-entries", new
+        {
+            editJournal.Reference,
+            editJournal.EntryDate,
+            editJournal.Description,
+            Status = editJournal.StatusStr
+        });
+        showJournalModal = false;
+        await LoadJournals();
+    }
+
+    private void ShowAPModal(APInvoiceDto? existing = null)
+    {
+        editAPInvoice = existing is null
+            ? new APInvoiceEditModel { InvoiceDate = DateTime.Today, DueDate = DateTime.Today.AddDays(30), StatusStr = "Draft" }
+            : new APInvoiceEditModel
+            {
+                Id = existing.Id,
+                InvoiceNumber = existing.InvoiceNumber,
+                VendorId = existing.VendorId,
+                InvoiceDate = existing.InvoiceDate,
+                DueDate = existing.DueDate,
+                SubTotal = existing.SubTotal,
+                TaxAmount = existing.TaxAmount,
+                TotalAmount = existing.TotalAmount,
+                StatusStr = existing.Status.ToString(),
+                Notes = existing.Notes
+            };
+        showAPModal_flag = true;
+    }
+
+    private void RecalcAPTotal()
+    {
+        if (editAPInvoice is not null)
+            editAPInvoice.TotalAmount = editAPInvoice.SubTotal + editAPInvoice.TaxAmount;
+    }
+
+    private async Task SaveAPInvoice()
+    {
+        if (editAPInvoice is null) return;
+        var payload = new
+        {
+            editAPInvoice.InvoiceNumber,
+            editAPInvoice.VendorId,
+            editAPInvoice.InvoiceDate,
+            editAPInvoice.DueDate,
+            editAPInvoice.SubTotal,
+            editAPInvoice.TaxAmount,
+            editAPInvoice.TotalAmount,
+            Status = editAPInvoice.StatusStr,
+            editAPInvoice.Notes
+        };
+        if (editAPInvoice.Id == 0)
+            await Api.PostAsync<object, ApiResponse<APInvoiceDto>>("/api/ap-invoices", payload);
+        else
+            await Api.PutAsync<object, ApiResponse<APInvoiceDto>>($"/api/ap-invoices/{editAPInvoice.Id}", payload);
+        showAPModal_flag = false;
+        await LoadAPInvoices();
+    }
+
+    private void ShowARModal(ARInvoiceDto? existing = null)
+    {
+        editARInvoice = existing is null
+            ? new ARInvoiceEditModel { InvoiceDate = DateTime.Today, DueDate = DateTime.Today.AddDays(30), StatusStr = "Draft" }
+            : new ARInvoiceEditModel
+            {
+                Id = existing.Id,
+                InvoiceNumber = existing.InvoiceNumber,
+                CustomerId = existing.CustomerId,
+                InvoiceDate = existing.InvoiceDate,
+                DueDate = existing.DueDate,
+                SubTotal = existing.SubTotal,
+                TaxAmount = existing.TaxAmount,
+                TotalAmount = existing.TotalAmount,
+                PaidAmount = existing.PaidAmount,
+                StatusStr = existing.Status.ToString(),
+                Notes = existing.Notes
+            };
+        showARModal_flag = true;
+    }
+
+    private void RecalcARTotal()
+    {
+        if (editARInvoice is not null)
+            editARInvoice.TotalAmount = editARInvoice.SubTotal + editARInvoice.TaxAmount;
+    }
+
+    private async Task SaveARInvoice()
+    {
+        if (editARInvoice is null) return;
+        var payload = new
+        {
+            editARInvoice.InvoiceNumber,
+            editARInvoice.CustomerId,
+            editARInvoice.InvoiceDate,
+            editARInvoice.DueDate,
+            editARInvoice.SubTotal,
+            editARInvoice.TaxAmount,
+            editARInvoice.TotalAmount,
+            Status = editARInvoice.StatusStr,
+            editARInvoice.Notes
+        };
+        await Api.PostAsync<object, ApiResponse<ARInvoiceDto>>("/api/ar-invoices", payload);
+        showARModal_flag = false;
+        await LoadARInvoices();
+    }
+
+    private void ShowBankModal(BankAccountDto? existing = null)
+    {
+        editBankAccount = existing is null
+            ? new BankAccountEditModel { Currency = "USD" }
+            : new BankAccountEditModel
+            {
+                Id = existing.Id,
+                Name = existing.Name,
+                BankName = existing.BankName,
+                AccountNumber = existing.AccountNumber,
+                Currency = existing.Currency,
+                Balance = existing.Balance
+            };
+        showBankModal = true;
+    }
+
+    private async Task SaveBankAccount()
+    {
+        if (editBankAccount is null) return;
+        await Api.PostAsync<object, ApiResponse<BankAccountDto>>("/api/bank-accounts", new
+        {
+            editBankAccount.Name,
+            editBankAccount.BankName,
+            editBankAccount.AccountNumber,
+            editBankAccount.Currency,
+            editBankAccount.Balance
+        });
+        showBankModal = false;
+        await LoadBankAccounts();
+    }
+
+    private static string AccountTypeColor(string type) => type switch
+    {
+        "Asset"     => "bg-blue-100 text-blue-700",
+        "Liability" => "bg-red-100 text-red-700",
+        "Equity"    => "bg-purple-100 text-purple-700",
+        "Revenue"   => "bg-green-100 text-green-700",
+        "Expense"   => "bg-orange-100 text-orange-700",
+        _           => "bg-gray-100 text-gray-600"
+    };
+
+    private static string JournalStatusColor(string status) => status switch
+    {
+        "Posted" => "bg-green-100 text-green-700",
+        "Draft"  => "bg-gray-100 text-gray-600",
+        "Voided" => "bg-red-100 text-red-600",
+        _        => "bg-gray-100 text-gray-600"
+    };
+
+    private static string InvoiceStatusColor(string status) => status switch
+    {
+        "Paid"           => "bg-green-100 text-green-700",
+        "PartiallyPaid"  => "bg-yellow-100 text-yellow-700",
+        "Pending"        => "bg-blue-100 text-blue-700",
+        "Approved"       => "bg-teal-100 text-teal-700",
+        "Overdue"        => "bg-red-100 text-red-700",
+        "Cancelled"      => "bg-gray-100 text-gray-500",
+        "Draft"          => "bg-gray-100 text-gray-500",
+        _                => "bg-gray-100 text-gray-600"
+    };
+
+    private class AccountEditModel
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string TypeStr { get; set; } = "Asset";
+        public string? Description { get; set; }
+    }
+
+    private class JournalEditModel
+    {
+        public int Id { get; set; }
+        public string Reference { get; set; } = "";
+        public DateTime EntryDate { get; set; } = DateTime.Today;
+        public string? Description { get; set; }
+        public string StatusStr { get; set; } = "Draft";
+        public decimal TotalDebit { get; set; }
+        public decimal TotalCredit { get; set; }
+    }
+
+    private class APInvoiceEditModel
+    {
+        public int Id { get; set; }
+        public string InvoiceNumber { get; set; } = "";
+        public int VendorId { get; set; }
+        public DateTime InvoiceDate { get; set; } = DateTime.Today;
+        public DateTime DueDate { get; set; } = DateTime.Today.AddDays(30);
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string StatusStr { get; set; } = "Draft";
+        public string? Notes { get; set; }
+    }
+
+    private class ARInvoiceEditModel
+    {
+        public int Id { get; set; }
+        public string InvoiceNumber { get; set; } = "";
+        public int CustomerId { get; set; }
+        public DateTime InvoiceDate { get; set; } = DateTime.Today;
+        public DateTime DueDate { get; set; } = DateTime.Today.AddDays(30);
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public decimal PaidAmount { get; set; }
+        public string StatusStr { get; set; } = "Draft";
+        public string? Notes { get; set; }
+    }
+
+    private class BankAccountEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string BankName { get; set; } = "";
+        public string AccountNumber { get; set; } = "";
+        public string Currency { get; set; } = "USD";
+        public decimal Balance { get; set; }
+    }
+}

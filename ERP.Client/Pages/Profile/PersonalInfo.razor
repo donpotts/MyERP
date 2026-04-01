@@ -1,0 +1,120 @@
+@inject ApiService Api
+
+<PageHeader Title="Personal Information" Subtitle="Manage your personal details and contact information.">
+    <Breadcrumb><span>/ Profile / <strong>Personal Information</strong></span></Breadcrumb>
+</PageHeader>
+
+@if (model is not null)
+{
+    <EditForm Model="model" OnValidSubmit="Save" FormName="personalInfo">
+        <DataAnnotationsValidator />
+
+        <div class="mb-8">
+            <h3 class="text-lg font-semibold text-gray-800">Basic Profile</h3>
+            <p class="text-sm text-gray-500 mb-4">Your public identity and bio.</p>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                    <InputText @bind-Value="model.FirstName" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                    <InputText @bind-Value="model.LastName" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Short Bio</label>
+                <InputTextArea @bind-Value="model.ShortBio" rows="3" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" placeholder="Tell us about yourself..." />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <InputText @bind-Value="model.JobTitle" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                    <InputDate @bind-Value="model.DateOfBirth" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+        </div>
+
+        <hr class="my-6 border-gray-200" />
+
+        <div class="mb-8">
+            <h3 class="text-lg font-semibold text-gray-800">Contact & Location</h3>
+            <p class="text-sm text-gray-500 mb-4">How we can reach you.</p>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <div class="relative">
+                        <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-lg">email</span>
+                        <input type="email" value="@userEmail" disabled class="w-full pl-10 pr-3 py-2.5 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <div class="relative">
+                        <span class="material-icons-outlined absolute left-3 top-2.5 text-gray-400 text-lg">phone</span>
+                        <InputText @bind-Value="model.Phone" class="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <InputText @bind-Value="model.Address" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" placeholder="Street, Building, Apt No." />
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <InputText @bind-Value="model.City" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <InputText @bind-Value="model.Country" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                    <InputText @bind-Value="model.PostalCode" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+                @(saving ? "Saving..." : "Save Changes")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="mt-4 p-3 rounded-lg text-sm @(isError ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600")">@message</div>
+        }
+    </EditForm>
+}
+
+@code {
+    private UpdateProfileRequest? model;
+    private string userEmail = "";
+    private bool saving;
+    private string? message;
+    private bool isError;
+
+    [Inject] private AuthService Auth { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<ApiResponse<UpdateProfileRequest>>("/api/profile");
+        model = result?.Data ?? new();
+        var user = await Auth.GetUserInfoAsync();
+        userEmail = user?.Email ?? "";
+    }
+
+    private async Task Save()
+    {
+        saving = true; message = null;
+        var result = await Api.PutAsync<UpdateProfileRequest, ApiResponse<string>>("/api/profile", model!);
+        message = result?.IsSuccess == true ? "Profile updated successfully!" : result?.Message ?? "Failed";
+        isError = result?.IsSuccess != true;
+        saving = false;
+    }
+}

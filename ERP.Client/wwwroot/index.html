@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ERP</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/tailwind.css" />
+    <script>
+        window.themeManager = {
+            getTheme:  () => localStorage.getItem('erp-theme')  || 'light',
+            getAccent: () => localStorage.getItem('erp-accent') || 'indigo',
+            setTheme:  (t) => {
+                localStorage.setItem('erp-theme', t);
+                document.documentElement.classList.toggle('dark', t === 'dark');
+            },
+            setAccent: (a) => {
+                localStorage.setItem('erp-accent', a);
+                document.documentElement.setAttribute('data-accent', a);
+            }
+        };
+        // Apply immediately to prevent flash
+        (function () {
+            var t = localStorage.getItem('erp-theme')  || 'light';
+            var a = localStorage.getItem('erp-accent') || 'indigo';
+            if (t === 'dark') document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-accent', a);
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="ERP.Client.styles.css" rel="stylesheet" onerror="this.remove()" />
+    <script type="importmap"></script>
+    <style>
+        /* ── Accent variables — cascade from html element ── */
+        :root                    { --accent:#6366f1; --accent-h:#4f46e5; --accent-light:#e0e7ff; --accent-t:#4f46e5; }
+        [data-accent="violet"]   { --accent:#7c3aed; --accent-h:#6d28d9; --accent-light:#ede9fe; --accent-t:#6d28d9; }
+        [data-accent="blue"]     { --accent:#2563eb; --accent-h:#1d4ed8; --accent-light:#dbeafe; --accent-t:#1d4ed8; }
+        [data-accent="emerald"]  { --accent:#059669; --accent-h:#047857; --accent-light:#d1fae5; --accent-t:#047857; }
+        [data-accent="rose"]     { --accent:#e11d48; --accent-h:#be123c; --accent-light:#ffe4e6; --accent-t:#be123c; }
+        [data-accent="amber"]    { --accent:#d97706; --accent-h:#b45309; --accent-light:#fef3c7; --accent-t:#b45309; }
+
+        /* ── Remap indigo → current accent (after Tailwind) ── */
+        .bg-indigo-600                      { background-color: var(--accent) !important; }
+        .bg-indigo-500                      { background-color: var(--accent) !important; }
+        .bg-indigo-50                       { background-color: var(--accent-light) !important; }
+        .bg-indigo-100                      { background-color: var(--accent-light) !important; }
+        .hover\:bg-indigo-700:hover         { background-color: var(--accent-h) !important; }
+        .active\:bg-indigo-800:active       { background-color: var(--accent-h) !important; }
+        .text-indigo-600                    { color: var(--accent-t) !important; }
+        .text-indigo-500                    { color: var(--accent-t) !important; }
+        .text-indigo-400                    { color: var(--accent-t) !important; }
+        .text-indigo-800                    { color: var(--accent-h) !important; }
+        .hover\:text-indigo-700:hover       { color: var(--accent-h) !important; }
+        .hover\:text-indigo-400:hover       { color: var(--accent-t) !important; }
+        .border-indigo-500                  { border-color: var(--accent) !important; }
+        .border-indigo-600                  { border-color: var(--accent) !important; }
+        .border-l-4.border-indigo-500       { border-color: var(--accent) !important; }
+        .focus\:ring-indigo-500:focus       { --tw-ring-color: var(--accent) !important; }
+        .focus\:border-indigo-500:focus     { border-color: var(--accent) !important; }
+        .from-indigo-500, .from-indigo-600  { --tw-gradient-from: var(--accent) !important; }
+        .to-indigo-600, .to-purple-600      { --tw-gradient-to: var(--accent-h) !important; }
+        .ring-indigo-500                    { --tw-ring-color: var(--accent) !important; }
+
+        /* ── Dark mode ── */
+        .dark body                          { background:#0f172a; color:#e2e8f0; }
+        .dark .bg-white                     { background-color:#1e293b !important; }
+        .dark .bg-gray-50                   { background-color:#0f172a !important; }
+        .dark .bg-gray-100                  { background-color:#1e293b !important; }
+        .dark .bg-gray-200                  { background-color:#334155 !important; }
+        .dark .border-gray-100,
+        .dark .border-gray-200,
+        .dark .border-gray-300             { border-color:#334155 !important; }
+        .dark .text-gray-900               { color:#f1f5f9 !important; }
+        .dark .text-gray-800               { color:#e2e8f0 !important; }
+        .dark .text-gray-700               { color:#cbd5e1 !important; }
+        .dark .text-gray-600               { color:#94a3b8 !important; }
+        .dark .text-gray-500               { color:#64748b !important; }
+        .dark .text-gray-400               { color:#475569 !important; }
+        .dark input,
+        .dark textarea,
+        .dark select                        { background-color:#0f172a !important; color:#e2e8f0 !important; border-color:#334155 !important; }
+        .dark input::placeholder,
+        .dark textarea::placeholder         { color:#475569 !important; }
+        .dark table                         { color:#e2e8f0; }
+        .dark thead tr,
+        .dark thead                         { background-color:#1e293b !important; }
+        .dark tbody tr:hover                { background-color:#1e293b !important; }
+        .dark tr                            { border-color:#334155 !important; }
+        .dark .hover\:bg-gray-50:hover      { background-color:#1e293b !important; }
+        .dark .hover\:bg-gray-100:hover     { background-color:#334155 !important; }
+        .dark .shadow-lg                    { box-shadow:0 10px 15px -3px rgba(0,0,0,.5) !important; }
+        .dark .shadow-2xl                   { box-shadow:0 25px 50px -12px rgba(0,0,0,.7) !important; }
+        .dark .bg-red-50                    { background-color:#450a0a !important; }
+        .dark .bg-green-50                  { background-color:#052e16 !important; }
+        .dark .bg-yellow-50                 { background-color:#422006 !important; }
+        .dark .bg-blue-50                   { background-color:#082f49 !important; }
+        .dark .bg-red-100                   { background-color:#450a0a !important; }
+        .dark .bg-green-100                 { background-color:#052e16 !important; }
+        .dark .bg-yellow-100                { background-color:#422006 !important; }
+        .dark .bg-blue-100                  { background-color:#082f49 !important; }
+        .dark .bg-purple-100                { background-color:#2e1065 !important; }
+        .dark .text-red-600,.dark .text-red-700     { color:#fca5a5 !important; }
+        .dark .text-green-600,.dark .text-green-700 { color:#86efac !important; }
+        .dark .text-yellow-600,.dark .text-yellow-700 { color:#fde68a !important; }
+        .dark .text-blue-600,.dark .text-blue-700   { color:#93c5fd !important; }
+        .dark .text-purple-600,.dark .text-purple-700 { color:#c4b5fd !important; }
+        .dark .bg-gray-100.rounded-full     { background-color:#334155 !important; }
+    </style>
+</head>
+
+<body class="font-['Inter']">
+    <div id="app">
+        <div class="flex items-center justify-center h-screen bg-dark-bg">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p class="mt-4 text-gray-400">Loading ERP...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" class="hidden fixed bottom-0 left-0 right-0 bg-red-600 text-white p-3 text-center z-50">
+        An unhandled error has occurred.
+        <a href="." class="underline ml-2">Reload</a>
+        <span class="dismiss cursor-pointer ml-4">&#x1F5D9;</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script>
+        window.brandingManager = {
+            setFavicon: function (url) {
+                var link = document.querySelector("link[rel~='icon']");
+                if (link) link.href = url;
+            }
+        };
+        window.scrollManager = {
+            init: function (elementId, dotNetRef, threshold) {
+                var el = document.getElementById(elementId);
+                if (!el) return;
+                el.addEventListener('scroll', function () {
+                    dotNetRef.invokeMethodAsync('OnScrolled', el.scrollTop > threshold);
+                });
+            }
+        };
+
+        // Collapsed-sidebar nav tooltips (position:fixed escapes overflow-y:auto clipping)
+        (function () {
+            var tip = null;
+            function getTip() {
+                if (!tip) {
+                    tip = document.createElement('div');
+                    tip.style.cssText = 'position:fixed;z-index:9999;background:#1e293b;color:#f1f5f9;' +
+                        'padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;' +
+                        'pointer-events:none;white-space:nowrap;' +
+                        'box-shadow:0 4px 12px rgba(0,0,0,0.35);opacity:0;transition:opacity 0.12s ease;';
+                    document.body.appendChild(tip);
+                }
+                return tip;
+            }
+            document.addEventListener('mouseover', function (e) {
+                var el = e.target && e.target.closest('[data-nav-tip]');
+                if (!el) return;
+                var t = getTip();
+                t.textContent = el.getAttribute('data-nav-tip');
+                var r = el.getBoundingClientRect();
+                t.style.opacity = '0';
+                t.style.top = '-9999px';
+                requestAnimationFrame(function () {
+                    t.style.left = (r.right + 10) + 'px';
+                    t.style.top = Math.round(r.top + (r.height - t.offsetHeight) / 2) + 'px';
+                    t.style.opacity = '1';
+                });
+            });
+            document.addEventListener('mouseout', function (e) {
+                if (!e.relatedTarget || !e.relatedTarget.closest('[data-nav-tip]')) {
+                    if (tip) tip.style.opacity = '0';
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>

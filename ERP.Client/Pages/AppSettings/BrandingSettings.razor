@@ -1,0 +1,249 @@
+@inject ApiService Api
+@inject BrandingService Branding
+@inject ThemeService Theme
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageHeader Title="Branding" Subtitle="Customize company name, logo, and theme colors." />
+
+@if (model is not null)
+{
+    <div class="max-w-lg space-y-0">
+        @* Form *@
+        <div class="space-y-5 w-full">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       @bind="model.CompanyName" @bind:event="oninput" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tagline</label>
+                <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       @bind="model.CompanyTagline" @bind:event="oninput" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">App Title</label>
+                <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       @bind="model.AppTitle" @bind:event="oninput" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Logo Text</label>
+                <input class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       placeholder="e.g. ERP" maxlength="4"
+                       @bind="model.LogoText" @bind:event="oninput" />
+                <p class="text-xs text-gray-400 mt-1">Abbreviation shown in the sidebar icon when no logo image is set.</p>
+            </div>
+            <div class="flex items-center justify-between py-2 border border-gray-100 rounded-lg px-3 bg-gray-50">
+                <div>
+                    <div class="text-sm font-medium text-gray-700">Truncate Sidebar Text</div>
+                    <div class="text-xs text-gray-400 mt-0.5">Clip long company names with an ellipsis in the sidebar</div>
+                </div>
+                <button type="button" @onclick="() => model.TruncateSidebarText = !model.TruncateSidebarText"
+                        class="@(model.TruncateSidebarText ? "bg-indigo-600" : "bg-gray-200") relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0">
+                    <span class="@(model.TruncateSidebarText ? "translate-x-6" : "translate-x-1") inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"></span>
+                </button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Logo</label>
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        @if (!string.IsNullOrEmpty(model.LogoUrl))
+                        {
+                            <img src="@model.LogoUrl" alt="Logo" class="w-full h-full object-contain" />
+                        }
+                        else
+                        {
+                            <span class="material-icons-outlined text-2xl text-gray-300">image</span>
+                        }
+                    </div>
+                    <div>
+                        <div class="relative inline-flex items-center">
+                            <span class="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 flex items-center gap-1.5 cursor-pointer select-none pointer-events-none">
+                                <span class="material-icons-outlined text-sm">upload</span>
+                                @(uploadingLogo ? "Uploading..." : "Upload Logo")
+                            </span>
+                            <InputFile OnChange="UploadLogoFile" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" accept=".png,.jpg,.jpeg,.svg,.gif,.ico" disabled="@uploadingLogo" />
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1.5">PNG, SVG, JPG, ICO · max 5 MB</p>
+                        @if (uploadingLogo)
+                        {
+                            <p class="text-xs text-indigo-500 mt-1 flex items-center gap-1">
+                                <span class="material-icons-outlined text-sm animate-spin">autorenew</span> Uploading...
+                            </p>
+                        }
+                        else if (!string.IsNullOrEmpty(logoError))
+                        {
+                            <p class="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                <span class="material-icons-outlined text-sm">error_outline</span> @logoError
+                            </p>
+                        }
+                        else if (!string.IsNullOrEmpty(model.LogoUrl))
+                        {
+                            <p class="text-xs text-green-600 mt-1 flex items-start gap-1">
+                                <span class="material-icons-outlined text-sm flex-shrink-0">check_circle</span>
+                                <span class="font-mono break-all">@model.LogoUrl.Split('?')[0]</span>
+                            </p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        @if (!string.IsNullOrEmpty(model.FaviconUrl))
+                        {
+                            <img src="@model.FaviconUrl" alt="Favicon" class="w-full h-full object-contain" />
+                        }
+                        else
+                        {
+                            <span class="material-icons-outlined text-2xl text-gray-300">tab</span>
+                        }
+                    </div>
+                    <div>
+                        <div class="relative inline-flex items-center">
+                            <span class="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 flex items-center gap-1.5 cursor-pointer select-none pointer-events-none">
+                                <span class="material-icons-outlined text-sm">upload</span>
+                                @(uploadingFavicon ? "Uploading..." : "Upload Favicon")
+                            </span>
+                            <InputFile OnChange="UploadFaviconFile" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" accept=".ico,.png,.svg" disabled="@uploadingFavicon" />
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1.5">ICO, PNG, SVG · max 5 MB</p>
+                        @if (uploadingFavicon)
+                        {
+                            <p class="text-xs text-indigo-500 mt-1 flex items-center gap-1">
+                                <span class="material-icons-outlined text-sm animate-spin">autorenew</span> Uploading...
+                            </p>
+                        }
+                        else if (!string.IsNullOrEmpty(faviconError))
+                        {
+                            <p class="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                <span class="material-icons-outlined text-sm">error_outline</span> @faviconError
+                            </p>
+                        }
+                        else if (!string.IsNullOrEmpty(model.FaviconUrl))
+                        {
+                            <p class="text-xs text-green-600 mt-1 flex items-start gap-1">
+                                <span class="material-icons-outlined text-sm flex-shrink-0">check_circle</span>
+                                <span class="font-mono break-all">@model.FaviconUrl.Split('?')[0]</span>
+                            </p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Accent Color Theme</label>
+                <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    @foreach (var (name, hex) in accentColors)
+                    {
+                        <button type="button"
+                                class="flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all @(selectedAccent == name ? "border-gray-800 shadow-md" : "border-transparent hover:border-gray-200")"
+                                @onclick="() => selectedAccent = name">
+                            <span class="w-8 h-8 rounded-full shadow-sm" style="background:@hex"></span>
+                            <span class="text-xs text-gray-600 capitalize">@name</span>
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button class="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 flex items-center gap-2"
+                        @onclick="Save" disabled="@saving">
+                    @if (saving) { <span class="material-icons-outlined text-sm animate-spin">autorenew</span> }
+                    @(saving ? "Saving..." : "Save Branding")
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(saveMessage))
+            {
+                <div class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                    <span class="material-icons-outlined text-base">check_circle</span> @saveMessage
+                </div>
+            }
+        </div>
+
+    </div>
+}
+else
+{
+    <div class="flex items-center justify-center h-32"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+}
+
+@code {
+    private CompanyBrandingDto? model;
+    private string saveMessage = "";
+    private string selectedAccent = "indigo";
+    private bool saving;
+    private bool uploadingLogo;
+    private bool uploadingFavicon;
+    private string? logoError;
+    private string? faviconError;
+
+    private static readonly (string Name, string Hex)[] accentColors =
+    {
+        ("indigo",  "#4f46e5"),
+        ("violet",  "#7c3aed"),
+        ("blue",    "#2563eb"),
+        ("emerald", "#059669"),
+        ("rose",    "#e11d48"),
+        ("amber",   "#d97706"),
+    };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await Api.GetAsync<ApiResponse<CompanyBrandingDto>>("/api/settings/branding");
+        model = r?.Data ?? new CompanyBrandingDto();
+        await Theme.InitAsync();
+        selectedAccent = Theme.Accent;
+    }
+
+    private Task UploadLogoFile(InputFileChangeEventArgs e)    => UploadBrandingFile(e, "logo");
+    private Task UploadFaviconFile(InputFileChangeEventArgs e) => UploadBrandingFile(e, "favicon");
+
+    private async Task UploadBrandingFile(InputFileChangeEventArgs e, string type)
+    {
+        var file = e.File;
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            if (type == "logo") logoError = "File too large (max 5MB)";
+            else faviconError = "File too large (max 5MB)";
+            return;
+        }
+
+        if (type == "logo") { uploadingLogo = true; logoError = null; }
+        else { uploadingFavicon = true; faviconError = null; }
+
+        using var content = new MultipartFormDataContent();
+        using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        content.Add(new StreamContent(stream), "file", file.Name);
+
+        var result = await Api.PostFileAsync($"/api/branding/upload/{type}", content);
+
+        if (type == "logo") uploadingLogo = false;
+        else uploadingFavicon = false;
+
+        if (result?.IsSuccess == true && result.Data is not null)
+        {
+            if (type == "logo") model!.LogoUrl = result.Data;
+            else model!.FaviconUrl = result.Data;
+            await Branding.RefreshAsync();
+        }
+        else
+        {
+            var err = result?.Message ?? "Upload failed";
+            if (type == "logo") logoError = err;
+            else faviconError = err;
+        }
+    }
+
+    private async Task Save()
+    {
+        saving = true; saveMessage = "";
+        await Branding.SaveAsync(model!);
+        await Branding.RefreshAsync();
+        await Theme.SetAccentAsync(selectedAccent);
+        saving = false;
+        saveMessage = "Branding saved successfully.";
+        StateHasChanged();
+        await Task.Delay(3000);
+        saveMessage = "";
+    }
+}

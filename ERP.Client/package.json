@@ -1,0 +1,19 @@
+{
+  "name": "erp.client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "postcss Styles/tailwind-input.css -o wwwroot/css/tailwind.css",
+    "watch:css": "postcss Styles/tailwind-input.css -o wwwroot/css/tailwind.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "postcss-cli": "^11.0.1",
+    "tailwindcss": "^3.4.19"
+  }
+}
